@@ -28,7 +28,7 @@ jobs:
 
     - name: Esegui PyInstaller
       run: |
-        pyinstaller --onefile tuo_script.py
+        pyinstaller --onefile main.py
 
     - name: Salva l'eseguibile come pacchetto
       uses: actions/upload-artifact@v4
