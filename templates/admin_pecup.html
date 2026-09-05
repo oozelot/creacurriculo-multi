@@ -1,0 +1,66 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Gestione codici PECUP: {{ materia.nome }}</legend>
+    <p class="nota">Completare una classe alla volta. La classe proposta e' la prima che non ha ancora tutti i codici PECUP.</p>
+
+    <form method="get" class="scelta-fonti">
+        <fieldset>
+            <legend>1. Scegli classe, materie e anni sorgente</legend>
+            <label for="classe">Classe da completare</label>
+            <select id="classe" name="classe">
+                {% for voce in classi_mancanti %}<option value="{{ voce }}" {{ 'selected' if voce == classe }}>{{ voce }}</option>{% endfor %}
+            </select>
+            <div class="fonti-colonne">
+                <div><strong>Materie configurate da cui acquisire i testi</strong>
+                    <div class="lista-fonti">{% for fonte in materie_fonti %}
+                        <label><input type="checkbox" name="fonte" value="{{ fonte.id }}" {{ 'checked' if fonte.id in fonti }}> {{ fonte.nome }}</label>
+                    {% endfor %}</div>
+                </div>
+                <div><strong>Anni scolastici dei testi sorgente</strong>
+                    <div class="anni">{% for anno in ['PRIMA', 'SECONDA', 'TERZA', 'QUARTA', 'QUINTA'] %}
+                        <label><input type="checkbox" name="anno" value="{{ anno }}" {{ 'checked' if anno in anni or (not anni and anno == classe) }}> {{ anno }}</label>
+                    {% endfor %}</div>
+                </div>
+            </div>
+            <div class="barra"><button type="submit" id="carica-testi" disabled>Carica testi</button></div>
+        </fieldset>
+    </form>
+
+    {% if fonti and anni %}
+    <form method="post" id="form-pecup">
+        <input type="hidden" name="classe" value="{{ classe }}">
+        {% for fonte in fonti %}<input type="hidden" name="fonte" value="{{ fonte }}">{% endfor %}
+        {% for anno in anni %}<input type="hidden" name="anno" value="{{ anno }}">{% endfor %}
+        <fieldset><legend>2. Seleziona i testi per {{ classe }}</legend>
+            <div class="pecup-griglie">
+                {% for titolo, nome, voci in [("Abilita'", "abilita", abilita), ("Conoscenze", "conoscenza", conoscenze), ("Competenze", "competenza", competenze)] %}
+                <fieldset><legend>{{ titolo }}</legend>
+                    <button type="button" class="seleziona-tutto" data-tipo="{{ nome }}">Seleziona tutto</button>
+                    <div class="lista-pecup">{% for voce in voci %}
+                        <label><input type="checkbox" name="{{ nome }}" value="{{ voce }}"> {{ voce }}</label>
+                    {% else %}<p class="nota">Nessun testo disponibile con le fonti e gli anni scelti.</p>{% endfor %}</div>
+                    <label for="{{ nome }}_personalizzato">Aggiungi testo personalizzato</label>
+                    <textarea id="{{ nome }}_personalizzato" name="{{ nome }}_personalizzato" rows="3" maxlength="900"></textarea>
+                </fieldset>{% endfor %}
+            </div>
+            <div class="barra"><a class="bottone" href="{{ url_for('admin_materie') }}" data-attesa>Annulla</a><button type="submit" id="salva-pecup" disabled>Salva codici PECUP per {{ classe }}</button></div>
+        </fieldset>
+    </form>
+    {% endif %}
+</fieldset>
+<style>
+    .scelta-fonti select { width: 180px; }.fonti-colonne, .pecup-griglie { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }.pecup-griglie { grid-template-columns: repeat(3, minmax(0, 1fr)); }.lista-fonti { height: 210px; overflow: auto; border: 1px solid #7f9db9; padding: 4px; }.anni { padding: 6px; border: 1px solid #7f9db9; }.lista-fonti label, .anni label, .lista-pecup label { font-weight: normal; }.lista-pecup { height: 250px; overflow: auto; border: 1px solid #7f9db9; padding: 4px; }#carica-testi:disabled, #salva-pecup:disabled { background: #ff3b30; color: #fff; }#carica-testi:not(:disabled), #salva-pecup:not(:disabled) { background: #1b5e20; color: #ffeb3b; }@media (max-width: 800px) { .fonti-colonne, .pecup-griglie { grid-template-columns: 1fr; } }
+</style>
+<script>
+    const formFonti = document.querySelector('.scelta-fonti');
+    const carica = document.getElementById('carica-testi');
+    function aggiornaFonti() { carica.disabled = !formFonti.querySelector('input[name="fonte"]:checked') || !formFonti.querySelector('input[name="anno"]:checked'); }
+    formFonti.querySelectorAll('input').forEach(campo => campo.addEventListener('change', aggiornaFonti));
+    formFonti.addEventListener('submit', () => { document.getElementById('carica-testi').disabled = true; });
+    aggiornaFonti();
+    const formPecup = document.getElementById('form-pecup');
+    if (formPecup) { const salva = document.getElementById('salva-pecup'); function aggiornaPecup() { salva.disabled = !['abilita','conoscenza','competenza'].every(tipo => formPecup.querySelector(`input[name="${tipo}"]:checked`) || formPecup.querySelector(`[name="${tipo}_personalizzato"]`).value.trim().length >= 3); } formPecup.querySelectorAll('input,textarea').forEach(campo => { campo.addEventListener('input', aggiornaPecup); campo.addEventListener('change', aggiornaPecup); }); document.querySelectorAll('.seleziona-tutto').forEach(pulsante => pulsante.addEventListener('click', () => { formPecup.querySelectorAll(`input[name="${pulsante.dataset.tipo}"]`).forEach(casella => { casella.checked = true; }); aggiornaPecup(); })); aggiornaPecup(); }
+</script>
+{% endblock %}

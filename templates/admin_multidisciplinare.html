@@ -1,0 +1,77 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Progettazione per competenze per aree multidisciplinari</legend>
+
+    <form method="get" id="selezione">
+        <div class="colonne">
+            <fieldset style="max-width:170px">
+                <legend>Selez. classi</legend>
+                {% for voce in classi %}
+                <label class="scelta"><input type="radio" name="classe" value="{{ voce }}"
+                        {{ 'checked' if classe == voce }} onchange="this.form.submit()">
+                    {{ nomi_classi[loop.index0] }}</label>
+                {% endfor %}
+            </fieldset>
+
+            <fieldset style="max-width:260px">
+                <legend>Indirizzo</legend>
+                {% for voce in indirizzi %}
+                <label class="scelta {{ 'disabilitata' if loop.index > 4 and not triennio }}">
+                    <input type="checkbox" name="indirizzo" value="{{ voce }}"
+                        {{ 'checked' if voce in scelti }}
+                        {{ 'disabled' if loop.index > 4 and not triennio }}
+                        onchange="this.form.submit()"> {{ voce }}</label>
+                {% endfor %}
+            </fieldset>
+
+            <fieldset>
+                <legend>Area/e multidisciplinari disponibili</legend>
+                {% if disponibili %}
+                {% for voce in disponibili %}
+                <label class="scelta"><input type="checkbox" name="area" form="creazione"
+                        value="{{ voce.nome }}"> {{ voce.nome }}
+                    <span class="nota">({{ voce.quante }} u.d.)</span></label>
+                {% endfor %}
+                {% else %}
+                <p class="nota">Selezionare una classe e almeno un indirizzo per vedere le aree
+                    dichiarate nelle programmazioni ricevute.</p>
+                {% endif %}
+            </fieldset>
+        </div>
+    </form>
+
+    <form method="post" action="{{ url_for('admin_crea_multidisciplinare') }}" id="creazione">
+        <input type="hidden" name="classe" value="{{ classe }}">
+        {% for voce in scelti %}
+        <input type="hidden" name="indirizzo" value="{{ voce }}">
+        {% endfor %}
+        <div class="barra">
+            <button type="submit" id="crea-documento" {{ 'disabled' if not disponibili }}>Crea documento</button>
+        </div>
+    </form>
+
+    {% if documento %}
+    <div class="barra">
+        <span>Documento creato: <strong>{{ documento }}</strong></span>
+        <form method="post" action="{{ url_for('admin_apri') }}">
+            <input type="hidden" name="nome" value="{{ documento }}">
+            <button type="submit">Apri il documento</button>
+        </form>
+        <a class="bottone" href="{{ url_for('admin_scarica', nome=documento) }}">Scarica</a>
+    </div>
+    {% endif %}
+</fieldset>
+<script>
+    const creaDocumento = document.getElementById("crea-documento");
+    const aree = document.querySelectorAll('input[name="area"]');
+
+    function aggiornaCreazione() {
+        creaDocumento.disabled = ![...aree].some(casella => casella.checked);
+    }
+
+    aree.forEach(casella => casella.addEventListener("change", aggiornaCreazione));
+    aggiornaCreazione();
+</script>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block titolo %}Step 2 - Dati generali{% endblock %}
+{% block intestazione %}STEP 2 &mdash; DATI GENERALI DELLA PROGRAMMAZIONE{% endblock %}
+
+{% macro gruppo_opzioni(titolo, nome, elenco, scelte, altri) %}
+<fieldset class="gruppo-opzioni" data-gruppo="{{ nome }}">
+    <legend class="lista-obbligatoria" data-lista-obbligatoria="step2">{{ titolo }}</legend>
+    <div class="scelte">
+        {% for voce in elenco %}
+        <label><input type="checkbox" name="{{ nome }}" value="{{ loop.index }}"
+                {{ 'checked' if loop.index in scelte }}> {{ voce }}</label>
+        {% endfor %}
+    </div>
+    <div class="griglia griglia-2" style="margin-top:10px">
+        {% for i in range(1, max_altro + 1) %}
+        <div>
+            <label class="scelta-inline"><input type="checkbox" class="casella-altro casella-altro-{{ i }}" name="{{ nome }}"
+                    value="{{ elenco | length + i }}"
+                    {{ 'checked' if (elenco | length + i) in scelte }}> ALTRO {{ i }}</label>
+            <input type="text" id="{{ nome }}_altro_{{ i }}" name="{{ nome }}_altro_{{ i }}"
+                maxlength="{{ limiti.opzione_altro }}" value="{{ altri[i - 1] }}">
+        </div>
+        {% endfor %}
+    </div>
+</fieldset>
+{% endmacro %}
+
+{% block contenuto %}
+<form method="post" id="form-step2">
+    <fieldset class="riepilogo-verifiche">
+        <legend>Ore e verifiche (in base a delibera dipartimenti o collegio docenti)</legend>
+        <div class="griglia griglia-4">
+            <div>
+                <label for="ore_settimanali">Ore settimanali</label>
+                <input type="number" class="campo-numero" id="ore_settimanali" name="ore_settimanali" min="0" max="40"
+                    value="{{ prog.ore_settimanali }}" required>
+            </div>
+            <div>
+                <label for="verifiche_indistinte">Verifiche indistinte <span class="testo-ridotto">(orali, scritte, pratiche)</span></label>
+                <input type="number" class="campo-numero" id="verifiche_indistinte" name="verifiche_indistinte" min="0" max="20"
+                    value="{{ prog.verifiche_indistinte }}" required>
+            </div>
+            <div>
+                <label for="verifiche_orali">Di cui verifiche orali</label>
+                <input type="number" class="campo-numero" id="verifiche_orali" name="verifiche_orali" min="0" max="20"
+                    value="{{ prog.verifiche_orali or 0 }}">
+            </div>
+            <div>
+                <label for="verifiche_pratiche">Di cui verifiche pratiche</label>
+                <input type="number" class="campo-numero" id="verifiche_pratiche" name="verifiche_pratiche" min="0" max="20"
+                    value="{{ prog.verifiche_pratiche or 0 }}">
+            </div>
+        </div>
+        <p class="nota">Il numero minimo di verifiche e' riferito al quadrimestre.</p>
+    </fieldset>
+
+    {{ gruppo_opzioni("Strategie metodologiche", "strategie", strategie, prog.strategie, prog.strategie_altro) }}
+    {{ gruppo_opzioni("Mezzi e strumenti", "mezzi", mezzi, prog.mezzi, prog.mezzi_altro) }}
+    {{ gruppo_opzioni("Strumenti di valutazione", "strumenti", strumenti, prog.strumenti, prog.strumenti_altro) }}
+
+</form>
+<script>
+    const formStep2 = document.getElementById("form-step2");
+    const ore = document.getElementById("ore_settimanali");
+    const verifiche = document.getElementById("verifiche_indistinte");
+    const orali = document.getElementById("verifiche_orali");
+    const pratiche = document.getElementById("verifiche_pratiche");
+    const salva = document.getElementById("salva-prosegui");
+    let ultimaSomma = null;
+
+    function valore(campo) {
+        return Number.parseInt(campo.value, 10) || 0;
+    }
+
+    function coloraNumero(campo, valido, giallo = false) {
+        campo.classList.remove("campo-rosso", "campo-verde", "campo-giallo");
+        campo.classList.add(giallo ? "campo-giallo" : valido ? "campo-verde" : "campo-rosso");
+    }
+
+    function aggiornaVerifiche() {
+        const totale = valore(verifiche);
+        coloraNumero(ore, valore(ore) > 0);
+        coloraNumero(verifiche, totale > 0);
+        [orali, pratiche].forEach(campo => {
+            campo.disabled = totale === 0;
+            campo.classList.toggle("campo-disabilitato", campo.disabled);
+            if (campo.disabled) {
+                campo.classList.remove("campo-rosso", "campo-verde", "campo-giallo");
+            } else {
+                coloraNumero(campo, valore(campo) > 0, valore(campo) === 0);
+            }
+        });
+        const somma = valore(orali) + valore(pratiche);
+        if (somma > totale) {
+            window.alert("La somma delle verifiche orali e pratiche non puo' superare il totale.");
+            orali.value = "0";
+            pratiche.value = "0";
+            ultimaSomma = null;
+        } else if (totale > 0 && somma === totale && ultimaSomma !== totale) {
+            if (!window.confirm("Sei sicuro di non avere verifiche scritte?")) {
+                pratiche.value = "";
+            }
+        }
+        ultimaSomma = valore(orali) + valore(pratiche);
+    }
+
+    [orali, pratiche].forEach(campo => campo.addEventListener("blur", () => {
+        if (campo.value.trim() === "") { campo.value = "0"; }
+        aggiornaStato();
+    }));
+    formStep2.addEventListener("submit", () => {
+        [orali, pratiche].forEach(campo => {
+            if (campo.value.trim() === "") { campo.value = "0"; }
+        });
+    });
+
+    function aggiornaAltro(gruppo) {
+        const primo = gruppo.querySelector(".casella-altro-1");
+        const secondo = gruppo.querySelector(".casella-altro-2");
+        const testoPrimo = gruppo.querySelector('[id$="_altro_1"]');
+        const testoSecondo = gruppo.querySelector('[id$="_altro_2"]');
+        const primoValido = testoPrimo.value.trim().length >= 3;
+
+        testoPrimo.disabled = !primo.checked;
+        testoPrimo.classList.toggle("campo-disabilitato", testoPrimo.disabled);
+        testoPrimo.classList.toggle("campo-verde", primo.checked && primoValido);
+        testoPrimo.classList.toggle("campo-rosso", primo.checked && !primoValido);
+
+        secondo.disabled = !primoValido;
+        if (!primoValido) { secondo.checked = false; }
+        testoSecondo.disabled = !secondo.checked;
+        testoSecondo.classList.toggle("campo-disabilitato", testoSecondo.disabled);
+        testoSecondo.classList.toggle("campo-verde", secondo.checked && testoSecondo.value.trim().length >= 3);
+        testoSecondo.classList.toggle("campo-rosso", secondo.checked && testoSecondo.value.trim().length < 3);
+    }
+
+    function aggiornaStato() {
+        aggiornaVerifiche();
+        const gruppi = [...document.querySelectorAll(".gruppo-opzioni")];
+        gruppi.forEach(aggiornaAltro);
+        const gruppiCompleti = gruppi.every(gruppo => {
+            const selezioni = gruppo.querySelectorAll("input[name]:checked");
+            return selezioni.length > 0 && gruppo.querySelectorAll(".campo-rosso").length === 0;
+        });
+        gruppi.forEach(gruppo => {
+            const legend = gruppo.querySelector('.lista-obbligatoria');
+            const ok = gruppo.querySelectorAll('input[name]:checked').length > 0;
+            legend.classList.toggle('completa', ok);
+            legend.classList.toggle('incompleta', !ok);
+        });
+        const campiRossi = formStep2.querySelectorAll(".campo-rosso").length > 0;
+        const incompleto = campiRossi || !gruppiCompleti || valore(ore) === 0 || valore(verifiche) === 0;
+        salva.disabled = incompleto;
+        salva.classList.toggle("stato-incompleto", incompleto);
+        salva.classList.toggle("stato-completo", !incompleto);
+    }
+
+    formStep2.querySelectorAll("input").forEach(campo => {
+        campo.addEventListener("input", aggiornaStato);
+        campo.addEventListener("change", evento => {
+            const casellaAltro1 = evento.target.closest(".gruppo-opzioni")?.querySelector(".casella-altro-1");
+            const testoAltro2 = evento.target.closest(".gruppo-opzioni")?.querySelector('[id$="_altro_2"]');
+            if (evento.target.classList.contains("casella-altro-1") && !evento.target.checked
+                && testoAltro2.value.trim()) {
+                evento.target.checked = true;
+                alert("Per togliere la spunta di Altro 1 devi prima svuotare Altro 2.");
+            }
+            aggiornaStato();
+        });
+    });
+    document.querySelectorAll(".uscita-non-salvare").forEach(link => {
+        link.addEventListener("click", evento => {
+            if (salva.disabled && !window.confirm("Alcuni campi non sono stati selezionati, le modifiche non saranno salvate. Premi OK per uscire, Annulla per continuare le modifiche.")) {
+                evento.preventDefault();
+            }
+        });
+    });
+    aggiornaStato();
+</script>
+{% endblock %}

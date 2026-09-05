@@ -1,0 +1,103 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Gestione del data base</legend>
+
+    <div class="colonne liste-database">
+        <fieldset>
+            <legend>File .ini nella cartella ricevuti</legend>
+            <div class="lista-selezionabile" id="lista-file">
+                {% for voce in file_ricevuti %}
+                <label><input type="radio" name="file" value="{{ voce.nome }}" data-importato="{{ '1' if voce.importato else '0' }}"> {{ voce.nome }}</label>
+                {% else %}
+                <span>Nessun file nella cartella ADMIN/file_ricevuti.</span>
+                {% endfor %}
+            </div>
+            <div class="selezione-database" id="file-selezionato"></div>
+            <div class="barra">
+                <form method="post" id="azioni-file"><input type="hidden" name="nome" id="nome-file">
+                    <button type="submit" formaction="{{ url_for('admin_file_stampe') }}">Stampe Word</button>
+                    <button type="submit" formaction="{{ url_for('admin_importa') }}" id="aggiungi-database">Aggiungi al data base</button>
+                    <button type="submit" formaction="{{ url_for('admin_importa_tutti') }}" id="aggiungi-tutti">Aggiungi tutti i file al database</button>
+                    <button type="submit" formaction="{{ url_for('admin_file_impostazioni') }}">Crea Cartella Dati utente</button>
+                </form>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Record contenuti nel data base</legend>
+            <div class="lista-selezionabile" id="lista-record">
+            {% for voce in record %}
+                <label><input type="radio" name="record" value="{{ voce.id }}" data-nome="{{ voce.nome_file }}"> {{ voce.nome_file }}</label>
+            {% else %}
+                <span>Il data base non contiene record.</span>
+            {% endfor %}
+            </div>
+            <div class="selezione-database" id="record-selezionato"></div>
+            <div class="barra">
+                <form method="post" id="azioni-record"><input type="hidden" name="identificativo" id="identificativo-record">
+                    <button type="submit" formaction="{{ url_for('admin_azione_record', azione='esporta') }}">Trasforma in file .ini</button>
+                    <button type="submit" formaction="{{ url_for('admin_azione_record', azione='elimina') }}" id="cancella-record">Cancella record</button>
+                </form>
+            </div>
+        </fieldset>
+    </div>
+</fieldset>
+<script>
+    function collegaLista(nome, destinazione, campoNascosto, testo = casella => casella.value) {
+        const caselle = document.querySelectorAll(`input[name="${nome}"]`);
+        const campo = document.getElementById(campoNascosto);
+        function aggiorna() {
+            const scelta = [...caselle].find(casella => casella.checked);
+            campo.value = scelta ? scelta.value : "";
+            document.getElementById(destinazione).textContent = scelta ? testo(scelta) : "";
+        }
+        caselle.forEach(casella => casella.addEventListener("change", aggiorna));
+        aggiorna();
+        return () => [...caselle].find(casella => casella.checked);
+    }
+    const fileSelezionato = collegaLista("file", "file-selezionato", "nome-file");
+    const recordSelezionato = collegaLista("record", "record-selezionato", "identificativo-record", casella => casella.dataset.nome);
+    const pulsantiFile = document.querySelectorAll("#azioni-file button");
+    const pulsantiRecord = document.querySelectorAll("#azioni-record button");
+    function aggiornaPulsanti() {
+        const fileScelto = Boolean(fileSelezionato());
+        const recordScelto = Boolean(recordSelezionato());
+        pulsantiFile.forEach(pulsante => {
+            pulsante.disabled = pulsante.id === "aggiungi-tutti" ? false : !fileScelto;
+        });
+        pulsantiRecord.forEach(pulsante => { pulsante.disabled = !recordScelto; });
+    }
+    document.querySelectorAll('input[name="file"], input[name="record"]')
+        .forEach(casella => casella.addEventListener("change", aggiornaPulsanti));
+    aggiornaPulsanti();
+    document.getElementById("azioni-file").addEventListener("submit", evento => {
+        const scelta = fileSelezionato();
+        if (!scelta && evento.submitter.id !== "aggiungi-tutti") { evento.preventDefault(); return; }
+        if (evento.submitter.id === "aggiungi-database" && scelta.dataset.importato === "1"
+            && !confirm("Il record e' gia' presente. Sostituire i dati esistenti?")) {
+            evento.preventDefault();
+        }
+        if (evento.submitter.id === "aggiungi-tutti") {
+            const giaPresenti = [...document.querySelectorAll('input[name="file"][data-importato="1"]')]
+                .map(casella => casella.parentElement.textContent.trim());
+            const campoSostituisci = document.createElement("input");
+            campoSostituisci.type = "hidden";
+            campoSostituisci.name = "sostituisci";
+            campoSostituisci.value = giaPresenti.length && confirm(
+                "File gia' presenti nel database (" + giaPresenti.length + "):\n\n"
+                + giaPresenti.join("\n")
+                + "\n\nSostituire questi dati?"
+            ) ? "1" : "0";
+            evento.target.appendChild(campoSostituisci);
+        }
+    });
+    document.getElementById("azioni-record").addEventListener("submit", evento => {
+        if (!document.getElementById("identificativo-record").value) { evento.preventDefault(); return; }
+        if (evento.submitter.id === "cancella-record" && !confirm("Eliminare definitivamente questo record dal data base?")) {
+            evento.preventDefault();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block titolo %}U.D. {{ indice }} del modulo {{ numero }}{% endblock %}
+{% block intestazione %}UNITA' DIDATTICA N. {{ indice }} &mdash; MODULO N. {{ numero }}{% endblock %}
+
+{% macro blocco_pecup(titolo, prefisso_testo, prefisso_codice, intervallo, testi, codici, elenco, limite) %}
+<fieldset class="lista-codificata">
+    <legend class="lista-obbligatoria" data-lista-obbligatoria="codificata">{{ titolo }}</legend>
+    {% for i in intervallo %}
+    <div class="griglia riga-codificata" data-riga="{{ i }}" style="grid-template-columns: 220px 1fr; margin-bottom:8px">
+        <div>
+            <select name="{{ prefisso_codice }}{{ i }}" class="codice-pecup campo-progressivo">
+                <option value="">&mdash; nessun codice &mdash;</option>
+                <option value="xxxxxxxxxxxx" {{ 'selected' if codici[i - 1] == 'xxxxxxxxxxxx' }}>xxxxxxxxxxxx</option>
+                {% for voce in elenco %}
+                <option value="{{ voce.codice }}" data-descrizione="{{ voce.descrizione }}"
+                    {{ 'selected' if codici[i - 1] == voce.codice }}>{{ voce.codice }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <textarea name="{{ prefisso_testo }}{{ i }}" class="testo-codificato campo-progressivo" rows="2"
+                maxlength="{{ limite }}">{{ testi[i - 1] | pulito }}</textarea>
+        </div>
+    </div>
+    {% endfor %}
+    <p class="nota">Scegliendo un codice il testo corrispondente viene compilato automaticamente se vuoto.</p>
+</fieldset>
+{% endmacro %}
+
+{% block contenuto %}
+<form method="post" id="form-unita" class="form-unita">
+    <fieldset>
+        <legend>Dati dell'unita' didattica</legend>
+        <label for="titolo">Titolo</label>
+        <input type="text" id="titolo" class="campo-progressivo" name="titolo" maxlength="{{ limiti.titolo_ud }}"
+            value="{{ ud.titolo | pulito }}" required>
+
+        <label for="argomenti" style="margin-top:10px">Argomenti trattati (una riga per argomento)</label>
+        <textarea id="argomenti" class="campo-progressivo" name="argomenti" rows="6"
+            maxlength="{{ limiti.argomenti }}">{{ ud.argomenti | pulito }}</textarea>
+
+        <label for="prerequisiti" style="margin-top:10px">Prerequisiti (una riga per prerequisito)</label>
+        <textarea id="prerequisiti" class="campo-progressivo" name="prerequisiti" rows="4"
+            maxlength="{{ limiti.prerequisiti }}">{{ ud.prerequisiti | pulito }}</textarea>
+    </fieldset>
+
+    <fieldset>
+        <legend class="lista-obbligatoria" data-lista-obbligatoria="quadro">Quadro multidisciplinare</legend>
+        {% for voce in multidisciplinare %}
+        <label class="scelta-inline"><input type="radio" name="multidisciplinare" value="{{ loop.index }}"
+                {{ 'checked' if loop.index in ud.multidisciplinare }}> {{ voce }}</label>
+        {% endfor %}
+        <div id="altro-quadro" style="margin-top:10px">
+            <label for="multidisciplinare_altro">Quale altro quadro</label>
+            <input type="text" id="multidisciplinare_altro" class="campo-progressivo" name="multidisciplinare_altro"
+                maxlength="{{ limiti.multidisciplinare_altro }}" value="{{ ud.multidisciplinare_altro }}">
+        </div>
+    </fieldset>
+
+    {{ blocco_pecup("Abilita'", "abilita_", "codice_abilita_", intervallo_abilita, ud.abilita, ud.codici_abilita,
+    elenco_abilita, limiti.abilita) }}
+    {{ blocco_pecup("Conoscenze", "conoscenza_", "codice_conoscenza_", intervallo_conoscenze, ud.conoscenze,
+    ud.codici_conoscenze, elenco_conoscenze, limiti.conoscenza) }}
+    {{ blocco_pecup("Competenze PECUP", "competenza_pecup_", "codice_competenza_pecup_", intervallo_competenze,
+    ud.competenze_pecup, ud.codici_competenze_pecup, elenco_competenze, limiti.competenza_pecup) }}
+
+    <fieldset>
+        <legend class="lista-obbligatoria lista-check-obbligatoria">Competenze in chiave europea</legend>
+        <div class="scelte">
+            {% for voce in competenze_europee %}
+            <label><input type="checkbox" name="competenze_europee" value="{{ loop.index }}"
+                    {{ 'checked' if loop.index in ud.competenze_europee }}> {{ voce }}</label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend class="lista-obbligatoria lista-check-obbligatoria">Competenze di cittadinanza</legend>
+        <div class="scelte">
+            {% for voce in competenze_cittadinanza %}
+            <label><input type="checkbox" name="competenze_cittadinanza" value="{{ loop.index }}"
+                    {{ 'checked' if loop.index in ud.competenze_cittadinanza }}> {{ voce }}</label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Livelli di competenza raggiunti</legend>
+        <label for="competenze_minime">Minime</label>
+        <textarea id="competenze_minime" class="campo-progressivo" name="competenze_minime" rows="3"
+            maxlength="{{ limiti.competenze_livello }}">{{ ud.competenze_minime | pulito }}</textarea>
+
+        <label for="competenze_intermedie" style="margin-top:10px">Intermedie <span class="testo-ridotto">(stesse competenze minime con l'aggiunta)</span></label>
+        <textarea id="competenze_intermedie" class="campo-progressivo" name="competenze_intermedie" rows="3"
+            maxlength="{{ limiti.competenze_livello }}">{{ ud.competenze_intermedie | pulito }}</textarea>
+
+        <label for="competenze_avanzate" style="margin-top:10px">Avanzate <span class="testo-ridotto">(stesse competenze avanzate con l'aggiunta)</span></label>
+        <textarea id="competenze_avanzate" class="campo-progressivo" name="competenze_avanzate" rows="3"
+            maxlength="{{ limiti.competenze_livello }}">{{ ud.competenze_avanzate | pulito }}</textarea>
+    </fieldset>
+
+</form>
+
+<script>
+    const formUnita = document.getElementById("form-unita");
+    const titoloUnita = document.getElementById("titolo");
+    const quadroAltro = document.getElementById("multidisciplinare_altro");
+    const salvaUnita = document.getElementById("salva-unita");
+    const almenoTre = valore => valore.trim().length >= 3;
+
+    function colora(campo, valido, attivo = true) {
+        campo.classList.remove("campo-rosso", "campo-verde", "campo-giallo");
+        campo.classList.remove("ud-rosso", "ud-verde");
+        campo.style.removeProperty("background-color");
+        if (attivo) {
+            campo.classList.add(valido ? "campo-verde" : "campo-rosso");
+            campo.classList.add(valido ? "ud-verde" : "ud-rosso");
+            campo.style.setProperty("background-color", valido ? "#b9f6a5" : "#ff3b30", "important");
+        }
+    }
+
+    function aggiornaListe() {
+        document.querySelectorAll('.lista-check-obbligatoria').forEach(legend => {
+            const gruppo = legend.closest("fieldset");
+            const ok = gruppo.querySelectorAll('input[type="checkbox"]:checked').length > 0;
+            legend.classList.toggle("completa", ok);
+            legend.classList.toggle("incompleta", !ok);
+        });
+        const quadro = document.querySelector('input[name="multidisciplinare"]:checked');
+        const quadroOk = Boolean(quadro);
+        const legendQuadro = document.querySelector('[data-lista-obbligatoria="quadro"]');
+        legendQuadro.classList.toggle("completa", quadroOk);
+        legendQuadro.classList.toggle("incompleta", !quadroOk);
+        const altroAttivo = quadro?.value === "4";
+        quadroAltro.disabled = !altroAttivo;
+        quadroAltro.classList.remove("campo-rosso", "campo-verde");
+        if (altroAttivo) {
+            quadroAltro.classList.add(almenoTre(quadroAltro.value) ? "campo-verde" : "campo-rosso");
+        }
+    }
+
+    function aggiornaCodici() {
+        document.querySelectorAll(".lista-codificata").forEach(lista => {
+            const righe = [...lista.querySelectorAll(".riga-codificata")];
+            const legend = lista.querySelector(".lista-obbligatoria");
+            const ok = Boolean(righe[0].querySelector(".codice-pecup").value)
+                && almenoTre(righe[0].querySelector(".testo-codificato").value);
+            legend.classList.toggle("completa", ok);
+            legend.classList.toggle("incompleta", !ok);
+            righe.forEach((riga, indice) => {
+                const codice = riga.querySelector(".codice-pecup");
+                const testo = riga.querySelector(".testo-codificato");
+                const precedente = indice === 0 || (
+                    righe[indice - 1].querySelector(".codice-pecup").value
+                    && almenoTre(righe[indice - 1].querySelector(".testo-codificato").value)
+                );
+                codice.disabled = !precedente;
+                testo.disabled = !codice.value;
+                codice.classList.toggle("codice-disabilitato", codice.disabled);
+                testo.classList.toggle("campo-disabilitato", testo.disabled);
+                codice.classList.remove("campo-rosso", "campo-verde", "campo-giallo");
+                testo.classList.remove("campo-rosso", "campo-verde", "campo-giallo");
+                if (!precedente) { return; }
+                if (!codice.value) {
+                    codice.classList.add(indice === 0 ? "campo-rosso" : "campo-giallo");
+                    return;
+                }
+                const completo = almenoTre(testo.value);
+                codice.classList.add(completo ? "campo-verde" : "campo-rosso");
+                colora(testo, completo);
+            });
+        });
+    }
+
+    function aggiornaUnita() {
+        colora(titoloUnita, almenoTre(titoloUnita.value));
+        ["argomenti", "prerequisiti", "competenze_minime", "competenze_intermedie", "competenze_avanzate"].forEach(id => {
+            const campo = document.getElementById(id);
+            colora(campo, Boolean(campo.value.trim()));
+        });
+        aggiornaListe();
+        aggiornaCodici();
+        const listeOk = [...document.querySelectorAll('.lista-obbligatoria.incompleta')].length === 0;
+        const codiciOk = [...document.querySelectorAll('.riga-codificata')].every(riga => {
+            const codice = riga.querySelector('.codice-pecup');
+            const testo = riga.querySelector('.testo-codificato');
+            return !codice.value || almenoTre(testo.value);
+        });
+        const primoCodiceOk = [...document.querySelectorAll('.lista-codificata')].every(lista =>
+            almenoTre(lista.querySelector('.testo-codificato').value)
+        );
+        salvaUnita.disabled = !almenoTre(titoloUnita.value) || !document.getElementById("argomenti").value.trim()
+            || !document.getElementById("prerequisiti").value.trim() || !document.getElementById("competenze_minime").value.trim() || !listeOk || !codiciOk || !primoCodiceOk;
+    }
+
+    formUnita.querySelectorAll("input, textarea, select").forEach(campo => {
+        campo.addEventListener("input", aggiornaUnita);
+        campo.addEventListener("change", aggiornaUnita);
+        if (campo.classList.contains("testo-codificato")) {
+            campo.addEventListener("input", () => {
+                if (!campo.value.trim()) {
+                    campo.closest(".riga-codificata").querySelector(".codice-pecup").value = "";
+                    aggiornaUnita();
+                }
+            });
+        }
+    });
+    document.querySelectorAll("select.codice-pecup").forEach(select => {
+        select.addEventListener("change", () => {
+            const testo = select.closest(".griglia").querySelector("textarea");
+            const opzione = select.selectedOptions[0];
+            if (!testo.value.trim() && opzione && opzione.dataset.descrizione) {
+                testo.value = opzione.dataset.descrizione;
+            }
+            if (!select.value) {
+                const lista = select.closest(".lista-codificata");
+                const righe = [...lista.querySelectorAll(".riga-codificata")];
+                const indice = righe.indexOf(select.closest(".riga-codificata"));
+                for (const riga of righe.slice(indice)) {
+                    riga.querySelector(".codice-pecup").value = "";
+                    riga.querySelector(".testo-codificato").value = "";
+                }
+            }
+            aggiornaUnita();
+        });
+    });
+    aggiornaUnita();
+</script>
+{% endblock %}

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+
+    <title>Referente Programmazione</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background-color: #d9d9d9;
+            font-family: "Courier New", monospace;
+        }
+
+    .finestra {
+    width: 880px;
+    min-height: 790px;
+
+    margin: 0 auto;
+    padding: 15px 18px;
+
+    background-color: white;
+
+    border: 2px solid black;
+
+    zoom: 0.75;
+}
+        /* TITOLO */
+
+        .titolo {
+            height: 30px;
+
+            text-align: center;
+
+            font-size: 20px;
+            font-weight: bold;
+
+            letter-spacing: 1px;
+
+            padding-top: 3px;
+
+            border: 2px solid;
+
+            border-color:
+                white
+                #999
+                #999
+                white;
+
+            background-color: #eeeeee;
+        }
+
+
+        /* COGNOME E NOME */
+
+        .anagrafica {
+            display: flex;
+
+            gap: 14px;
+
+            margin-top: 12px;
+        }
+
+        .campo-anagrafico {
+            display: flex;
+
+            align-items: center;
+
+            flex: 1;
+        }
+
+        .etichetta {
+            width: 105px;
+
+            height: 30px;
+
+            padding: 5px;
+
+            font-size: 18px;
+            font-weight: bold;
+
+            background-color: #eeeeee;
+
+            border: 2px solid;
+
+            border-color:
+                white
+                #999
+                #999
+                white;
+        }
+
+        .campo-rosso {
+            flex: 1;
+
+            height: 30px;
+
+            margin-left: 3px;
+
+            background-color: red;
+
+            border: 2px solid;
+
+            border-color:
+                #999
+                white
+                white
+                #999;
+        }
+
+
+        /* PARTE CENTRALE */
+
+        .parte-superiore {
+            display: flex;
+
+            margin-top: 20px;
+
+            gap: 12px;
+        }
+
+fieldset {
+    border: 2px solid #aaa;
+
+    min-height: 280px;
+
+    margin: 0;
+    padding: 15px;
+
+    background-color: #e5e5e5;
+}
+
+        legend {
+            padding: 0 5px;
+
+            font-size: 20px;
+            font-weight: bold;
+
+            color: #777;
+        }
+
+
+        /* CLASSE */
+
+        .classe {
+            width: 195px;
+        }
+
+
+        /* INDIRIZZO */
+
+        .indirizzo {
+            width: 360px;
+        }
+
+
+        .opzione {
+            margin-bottom: 17px;
+
+            font-size: 18px;
+
+            font-weight: bold;
+
+            color: #666;
+        }
+
+        input[type="radio"] {
+            width: 18px;
+            height: 18px;
+
+            margin-right: 10px;
+
+            vertical-align: middle;
+        }
+
+
+        /* PARTE DESTRA */
+
+        .destra {
+            width: 245px;
+        }
+
+
+        .messaggio {
+            min-height: 132px;
+
+            padding: 8px;
+
+            background-color: #fffca0;
+
+            border: 2px solid;
+
+            border-color:
+                white
+                #999
+                #999
+                white;
+
+            font-family: Arial, sans-serif;
+
+            font-size: 17px;
+
+            font-weight: bold;
+        }
+
+
+        button {
+            width: 100%;
+
+            height: 55px;
+
+            margin-top: 12px;
+
+            background-color: #e5e5e5;
+
+            border: 2px solid;
+
+            border-color:
+                white
+                #888
+                #888
+                white;
+
+            font-family: Arial, sans-serif;
+
+            font-size: 18px;
+
+            color: #777;
+        }
+
+        button:active {
+            border-color:
+                #888
+                white
+                white
+                #888;
+        }
+
+
+        .avanti {
+            font-size: 28px;
+        }
+
+
+        /* DISCIPLINA */
+
+        .disciplina {
+            margin-top: 18px;
+
+            height: 370px;
+        }
+
+        .area-disciplina {
+            width: 100%;
+
+            height: 335px;
+
+            background-color: #eeeeee;
+
+            border: 2px solid;
+
+            border-color:
+                #777
+                white
+                white
+                #777;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="finestra">
+
+
+    <!-- TITOLO -->
+
+    <div class="titolo">
+        REFERENTE PROGRAMMAZIONE
+    </div>
+
+
+    <!-- COGNOME E NOME -->
+
+    <div class="anagrafica">
+
+        <div class="campo-anagrafico">
+
+            <div class="etichetta">
+                COGNOME
+            </div>
+
+            <div class="campo-rosso"></div>
+
+        </div>
+
+
+        <div class="campo-anagrafico">
+
+            <div class="etichetta">
+                NOME
+            </div>
+
+            <div class="campo-rosso"></div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- PARTE SUPERIORE -->
+
+    <div class="parte-superiore">
+
+
+        <!-- CLASSE -->
+
+        <fieldset class="classe">
+
+            <legend>CLASSE</legend>
+
+            <div class="opzione">
+                <input type="radio" name="classe">
+                PRIMA
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="classe">
+                SECONDA
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="classe">
+                TERZA
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="classe">
+                QUARTA
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="classe">
+                QUINTA
+            </div>
+
+        </fieldset>
+
+
+
+        <!-- INDIRIZZO -->
+
+        <fieldset class="indirizzo">
+
+            <legend>INDIRIZZO</legend>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                COMUNE
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                CAT
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                GRAFICO
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                AGRARIO (tutte le articolazioni)
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                AGRARIO (g.a.t.)
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                AGRARIO (p.t.)
+            </div>
+
+            <div class="opzione">
+                <input type="radio" name="indirizzo">
+                AGRARIO (eno)
+            </div>
+
+        </fieldset>
+
+
+
+        <!-- DESTRA -->
+
+        <div class="destra">
+
+            <div class="messaggio">
+
+                I check si attivano solo dopo avere
+                caricato il cognome ed il nome.<br>
+
+                Il pulsante "AVANTI" si attiva solo
+                dopo avere caricato tutti i dati.
+
+            </div>
+
+
+            <button class="avanti">
+                AVANTI
+            </button>
+
+
+            <button>
+                Crea File di Installazione
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- DISCIPLINA -->
+
+    <fieldset class="disciplina">
+
+        <legend>DISCIPLINA</legend>
+
+        <div class="area-disciplina">
+
+        </div>
+
+    </fieldset>
+
+
+</div>
+
+</body>
+
+</html>

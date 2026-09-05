@@ -1,0 +1,2 @@
+semplice programma per creare dei file word da dati exel
+In utility il file excel contenente i dai e la maschera word per creare il documento

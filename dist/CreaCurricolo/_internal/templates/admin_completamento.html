@@ -1,0 +1,98 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Livello di completamento raccolta dati</legend>
+
+    <p class="nota">
+        Programmazioni ricevute: <strong>{{ griglia.programmazioni }}</strong> &mdash;
+        caselle previste: <strong>{{ griglia.attese }}</strong>, di cui coperte:
+        <strong>{{ griglia.ricevute }}</strong>.
+        Colonne: c = comune, C = CAT, G = grafico, A = agrario, g = g.a.t., p = p.t., e = eno.
+    </p>
+
+    <div style="overflow:auto">
+        <table class="griglia">
+            <tr>
+                <th class="disciplina"></th>
+                {% for classe in griglia.classi %}
+                <th colspan="{{ classe.colonne | length }}" class="classe">{{ classe.nome | lower }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                <th class="disciplina"></th>
+                {% for classe in griglia.classi %}
+                {% for colonna in classe.colonne %}
+                <th class="iniziale" title="{{ colonna.indirizzo }}">{{ colonna.iniziale }}</th>
+                {% endfor %}
+                {% endfor %}
+            </tr>
+            {% for riga in griglia.righe %}
+            <tr>
+                <th class="disciplina" title="{{ riga.disciplina }}"><div class="testo-disciplina" data-testo="{{ riga.disciplina }}">{{ riga.disciplina }}</div></th>
+                {% for gruppo in riga.classi %}
+                {% for cella in gruppo.celle %}
+                <td class="cella {{ cella.stato }}"
+                    title="{{ riga.disciplina }} - {{ gruppo.classe }} - {{ cella.indirizzo }}">
+                    {{ cella.quanti or '' }}</td>
+                {% endfor %}
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</fieldset>
+
+<style>
+    .griglia { border-collapse: collapse; background: #fff; }
+
+    .griglia th, .griglia td { padding: 1px 3px; border: 1px solid #000; font-size: 11px; text-align: center; }
+
+    .griglia th.classe, .griglia th.iniziale { background: #f0f0f0; border: 1px solid #9a9a9a; }
+
+    .griglia th.disciplina {
+        background: #f0f0f0;
+        text-align: right;
+        font-weight: bold;
+        width: 20ch;
+        min-width: 20ch;
+        max-width: 20ch;
+    }
+
+    .griglia .testo-disciplina {
+        width: 20ch;
+        padding-right: 5px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-align: right;
+        text-overflow: ellipsis;
+        position: relative;
+    }
+
+    .griglia .testo-disciplina:hover {
+        z-index: 1;
+    }
+
+    .griglia .testo-disciplina:hover::after {
+        content: attr(data-testo);
+        position: absolute;
+        right: 0;
+        top: -2px;
+        min-width: max-content;
+        max-width: 420px;
+        padding: 3px 5px;
+        border: 1px solid #000;
+        background: #fff59d;
+        color: #000;
+        text-align: left;
+        white-space: normal;
+        box-shadow: 2px 2px 0 #808080;
+    }
+
+    .griglia td.cella { width: 18px; height: 17px; color: #000; }
+
+    .griglia td.inattivo { background: #808080; }
+    .griglia td.mancante { background: #ff0000; }
+    .griglia td.presente { background: #00ff00; }
+</style>
+{% endblock %}

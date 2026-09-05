@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block titolo %}Step 1 - Dati della classe{% endblock %}
+{% block intestazione %}STEP 1 &mdash; DATI DELLA CLASSE{% endblock %}
+
+{% block contenuto %}
+<form method="post" id="form-step1">
+    <fieldset>
+        <legend>REFERENTE DELLA PROGRAMMAZIONE</legend>
+        <div class="griglia griglia-2">
+            <div>
+                <label for="cognome" class="identita-etichetta">Cognome</label>
+                <input type="text" id="cognome" name="cognome" class="input-identita testo-grassetto"
+                    maxlength="{{ limiti.cognome }}"
+                    value="{{ contesto.get('cognome', '') }}" required>
+            </div>
+            <div>
+                <label for="nome" class="identita-etichetta">Nome</label>
+                <input type="text" id="nome" name="nome" class="input-identita testo-grassetto"
+                    maxlength="{{ limiti.nome }}"
+                    value="{{ contesto.get('nome', '') }}" required>
+            </div>
+        </div>
+    </fieldset>
+
+    <div id="dati-programmazione" class="step1-dati nascosto">
+        <fieldset>
+            <legend>Classe</legend>
+            <div class="scelte classi-scelte">
+                {% for classe in classi %}
+                <label class="classe-{{ loop.index }}" data-valore="{{ classe }}"><input type="radio" name="classe" value="{{ classe }}"
+                        {{ 'checked' if contesto.get('classe') == classe }}> {{ classe }}</label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Indirizzo</legend>
+            <div class="scelte indirizzi-scelte">
+                {% for indirizzo in indirizzi %}
+                <label class="indirizzo-{{ loop.index }}" data-valore="{{ indirizzo }}"><input type="radio" name="indirizzo" value="{{ indirizzo }}"
+                        {{ 'checked' if contesto.get('indirizzo') == indirizzo }}> {{ indirizzo }}</label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="disciplina">
+            <legend class="lista-obbligatoria" data-lista-obbligatoria="disciplina">Disciplina</legend>
+            <div id="disciplina" class="scelte discipline-scelte">
+                {% for disciplina in discipline %}
+                <label data-valore="{{ disciplina }}"><input type="checkbox" name="disciplina" value="{{ disciplina }}"
+                        {{ 'checked' if contesto.get('disciplina') == disciplina }}> {{ disciplina }}</label>
+                {% endfor %}
+            </div>
+        </fieldset>
+    </div>
+
+</form>
+
+{% if lavori %}
+<fieldset id="lista-lavori" class="lista-programmazioni">
+    <legend>Programmazioni gia' presenti sul disco</legend>
+    <table>
+        <tr>
+            <th>Referente programmazione</th>
+            <th>Classe</th>
+            <th>Indirizzo</th>
+            <th>Disciplina</th>
+            <th style="width:90px"></th>
+        </tr>
+        {% for lavoro in lavori %}
+        <tr>
+            <td>{{ lavoro.cognome }} {{ lavoro.nome }}</td>
+            <td>{{ lavoro.classe }}</td>
+            <td>{{ lavoro.indirizzo }}</td>
+            <td>{{ lavoro.disciplina }}</td>
+            <td class="azioni-programmazione">
+                <form method="post" action="{{ url_for('apri') }}">
+                    {% for chiave, valore in lavoro.items() %}
+                    <input type="hidden" name="{{ chiave }}" value="{{ valore }}">
+                    {% endfor %}
+                    <button type="submit">Apri</button>
+                </form>
+                <form method="post" action="{{ url_for('elimina') }}"
+                    onsubmit="return confirm('Eliminare la programmazione selezionata e tutti i file contenuti nella sua cartella?');">
+                    {% for chiave, valore in lavoro.items() %}
+                    <input type="hidden" name="{{ chiave }}" value="{{ valore }}">
+                    {% endfor %}
+                    <button type="submit" class="pericolo">Elimina</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</fieldset>
+{% endif %}
+
+<script>
+    const lavori = {{ lavori | tojson }};
+    const form = document.getElementById("form-step1");
+    const cognome = document.getElementById("cognome");
+    const nome = document.getElementById("nome");
+    const datiProgrammazione = document.getElementById("dati-programmazione");
+    const listaLavori = document.getElementById("lista-lavori");
+    const avanti = document.getElementById("avanti");
+    const elenco = document.getElementById("disciplina");
+
+    function disciplinaSelezionata() {
+        return elenco.querySelector('input[name="disciplina"]:checked');
+    }
+
+    function normalizza(valore) {
+        return (valore || "").trim().toUpperCase();
+    }
+
+    function aggiornaEvidenziazioni() {
+        const cognomeValore = normalizza(cognome.value);
+        const nomeValore = normalizza(nome.value);
+        const delReferente = lavori.filter(lavoro =>
+            normalizza(lavoro.cognome) === cognomeValore
+            && normalizza(lavoro.nome) === nomeValore
+        );
+        const classiPresenti = new Set(delReferente.map(lavoro => normalizza(lavoro.classe)));
+        const indirizziPresenti = new Set(delReferente.map(lavoro => normalizza(lavoro.indirizzo)));
+        const classe = normalizza(document.querySelector('input[name="classe"]:checked')?.value);
+        const indirizzo = normalizza(document.querySelector('input[name="indirizzo"]:checked')?.value);
+        const disciplinePresenti = new Set(delReferente
+            .filter(lavoro => normalizza(lavoro.classe) === classe
+                && normalizza(lavoro.indirizzo) === indirizzo)
+            .map(lavoro => normalizza(lavoro.disciplina)));
+
+        document.querySelectorAll('.classi-scelte label').forEach(etichetta => {
+            etichetta.classList.toggle('gia-presente', classiPresenti.has(normalizza(etichetta.dataset.valore)));
+        });
+        document.querySelectorAll('.indirizzi-scelte label').forEach(etichetta => {
+            etichetta.classList.toggle('gia-presente', indirizziPresenti.has(normalizza(etichetta.dataset.valore)));
+        });
+        elenco.querySelectorAll('label').forEach(etichetta => {
+            etichetta.classList.toggle('gia-presente', disciplinePresenti.has(normalizza(etichetta.dataset.valore)));
+        });
+    }
+
+    function aggiornaStato() {
+        [cognome, nome].forEach(campo => { campo.value = campo.value.toUpperCase(); });
+        const identitaCompleta = cognome.value.trim() && nome.value.trim();
+        [cognome, nome].forEach(campo => {
+            campo.classList.toggle("completo", Boolean(campo.value.trim()));
+            campo.classList.toggle("incompleto", !campo.value.trim());
+        });
+        aggiornaEvidenziazioni();
+        datiProgrammazione.classList.toggle("nascosto", !identitaCompleta);
+        if (listaLavori) { listaLavori.classList.toggle("nascosto", Boolean(identitaCompleta)); }
+        const classe = document.querySelector('input[name="classe"]:checked');
+        const indirizzo = document.querySelector('input[name="indirizzo"]:checked');
+        const disciplinaLegend = document.querySelector('[data-lista-obbligatoria="disciplina"]');
+        disciplinaLegend.classList.toggle('completa', Boolean(disciplinaSelezionata()));
+        disciplinaLegend.classList.toggle('incompleta', !disciplinaSelezionata());
+        const accessoAdmin = normalizza(cognome.value) === "ADMIN"
+            && normalizza(nome.value) === "ADMIN";
+        avanti.disabled = !(accessoAdmin || (identitaCompleta && classe && indirizzo && disciplinaSelezionata()));
+    }
+
+    async function aggiornaDiscipline() {
+        const classe = document.querySelector('input[name="classe"]:checked');
+        const indirizzo = document.querySelector('input[name="indirizzo"]:checked');
+        if (!classe || !indirizzo) { return; }
+
+        const parametri = new URLSearchParams({ classe: classe.value, indirizzo: indirizzo.value });
+        const risposta = await fetch("{{ url_for('api_discipline') }}?" + parametri);
+        const discipline = await risposta.json();
+
+        const precedente = disciplinaSelezionata()?.value;
+        elenco.innerHTML = "";
+        for (const nome of discipline) {
+            const etichetta = document.createElement("label");
+            const casella = document.createElement("input");
+            casella.type = "checkbox";
+            casella.name = "disciplina";
+            casella.value = nome;
+            etichetta.dataset.valore = nome;
+            casella.checked = nome === precedente;
+            etichetta.append(casella, ` ${nome}`);
+            elenco.appendChild(etichetta);
+        }
+        aggiornaStato();
+    }
+
+    form.querySelectorAll('input[type="text"]')
+        .forEach(campo => campo.addEventListener("input", aggiornaStato));
+    elenco.addEventListener("change", evento => {
+        if (evento.target.name === "disciplina" && evento.target.checked) {
+            elenco.querySelectorAll('input[name="disciplina"]').forEach(casella => {
+                casella.checked = casella === evento.target;
+            });
+        }
+        aggiornaStato();
+    });
+    document.querySelectorAll('input[name="classe"], input[name="indirizzo"]')
+        .forEach(campo => campo.addEventListener("change", aggiornaDiscipline));
+    window.addEventListener("load", aggiornaStato);
+    let controlliAutocompletamento = 0;
+    const timerAutocompletamento = setInterval(() => {
+        aggiornaStato();
+        controlliAutocompletamento += 1;
+        if (controlliAutocompletamento >= 20) { clearInterval(timerAutocompletamento); }
+    }, 100);
+    aggiornaStato();
+</script>
+{% endblock %}

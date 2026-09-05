@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block titolo %}Step 4 - Invio{% endblock %}
+{% block intestazione %}STEP 4 &mdash; VERIFICA E INVIO{% endblock %}
+
+{% block contenuto %}
+<div id="step4">
+<table>
+    <tr>
+        <th style="width:220px">Sezione</th>
+        <th style="width:140px">Stato</th>
+        <th>Dettaglio</th>
+    </tr>
+    <tr>
+        <td>Dati generali (step 2)</td>
+        <td>{% if prog.step2_completo %}<span class="ok">completo</span>{% else %}<span class="ko">incompleto</span>{% endif %}</td>
+        <td>{{ prog.ore_settimanali or "-" }} ore settimanali, {{ prog.verifiche_indistinte or "-" }} verifiche minime</td>
+    </tr>
+    {% for mod in prog.moduli %}
+    <tr>
+        <td>Modulo {{ loop.index }}</td>
+        <td>{% if mod.completo %}<span class="ok">completo</span>{% else %}<span class="ko">incompleto</span>{% endif %}</td>
+        <td>
+            {{ mod.titolo | pulito or "(senza titolo)" }} &mdash; {{ mod.unita | length }} unita' didattiche
+            {% for ud in mod.unita %}
+            {% if not ud.completa %}<br><span class="ko">U.D. {{ loop.index }} incompleta</span>{% endif %}
+            {% endfor %}
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td>Moduli (step 3)</td>
+        <td><span class="ko">incompleto</span></td>
+        <td>Nessun modulo inserito.</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<fieldset>
+    <legend>File da inviare al referente</legend>
+    <p>Nome del file: <strong>{{ nome_file }}</strong></p>
+    <p>Cartella di salvataggio: <code>{{ cartella_invio }}</code></p>
+    {% if ini_esistente %}
+    <div class="avviso errore">Attenzione: il file esiste gia' e verra' sovrascritto.</div>
+    {% endif %}
+    <p class="nota">Il file viene salvato direttamente nella cartella del docente e va inviato al
+        referente senza modificarne il contenuto.</p>
+    <form method="post" action="{{ url_for('genera_ini') }}"
+        onsubmit="return {{ 'confirm(&quot;Il file esiste gia&#39;. Sovrascriverlo?&quot;)' if ini_esistente else 'true' }}">
+        <input type="hidden" name="conferma" value="1">
+        <button type="submit" class="principale" {{ 'disabled' if not completo }}>
+            {{ 'Sovrascrivi il file' if ini_esistente else 'Crea il file da inviare' }}
+        </button>
+        {% if ini_esistente %}
+        <a class="bottone" href="{{ url_for('scarica', cartella='da_inviare', nome=nome_file) }}">Scarica una copia</a>
+        {% endif %}
+    </form>
+</fieldset>
+
+<fieldset>
+    <legend>Documenti Word</legend>
+    <p>Cartella di salvataggio: <code>{{ cartella_output }}</code></p>
+
+    {% if documento_creato %}
+    <div class="avviso info">
+        <p>Documento creato: <strong>{{ documento_creato }}</strong>. Si desidera aprirlo adesso?</p>
+        <form method="post" action="{{ url_for('apri_documento') }}" style="display:inline">
+            <input type="hidden" name="nome" value="{{ documento_creato }}">
+            <button type="submit" class="principale">Apri il documento</button>
+        </form>
+        <a class="bottone" href="{{ url_for('scarica', cartella='output', nome=documento_creato) }}">Scarica</a>
+    </div>
+    {% endif %}
+
+    <table>
+        <tr>
+            <th>Documento</th>
+            <th style="width:210px"></th>
+        </tr>
+        {% for chiave, dati in documenti.items() %}
+        <tr>
+            <td>{{ dati[1] }}</td>
+            <td>
+                <form method="post" action="{{ url_for('genera_word', tipo=chiave) }}">
+                    <button type="submit" {{ 'disabled' if not completo }}>Crea documento</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% if documenti_creati %}
+    <p><strong>Documenti gia' presenti nella cartella output:</strong></p>
+    <table>
+        {% for nome in documenti_creati %}
+        <tr>
+            <td>{{ nome }}</td>
+            <td style="width:210px">
+                <form method="post" action="{{ url_for('apri_documento') }}" style="display:inline">
+                    <input type="hidden" name="nome" value="{{ nome }}">
+                    <button type="submit">Apri</button>
+                </form>
+                <a class="bottone" href="{{ url_for('scarica', cartella='output', nome=nome) }}">Scarica</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+    <p class="nota">I documenti vengono generati senza usare Word: si aprono con qualunque
+        programma di videoscrittura.</p>
+</fieldset>
+
+<div class="barra">
+    <a class="bottone" href="{{ url_for('step3') }}">&lsaquo; Torna ai moduli</a>
+</div>
+</div>
+{% endblock %}

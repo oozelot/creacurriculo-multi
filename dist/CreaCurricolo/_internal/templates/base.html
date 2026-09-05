@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block titolo %}Programmazione{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #d9d9d9;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            font-size: 14px;
+            color: #111;
+        }
+
+        .finestra {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 18px 22px 28px;
+            background-color: #fff;
+            border: 2px solid #333;
+        }
+
+        .titolo {
+            margin: -18px -22px 16px;
+            padding: 10px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            background-color: #eee;
+            border-bottom: 2px solid #999;
+        }
+
+        .passi { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+
+        .passi a, .passi span {
+            padding: 5px 12px;
+            background: #eee;
+            border: 1px solid #999;
+            text-decoration: none;
+            color: #111;
+            font-weight: bold;
+        }
+
+        .passi .passo-completo { background: #b9f6a5; border-color: #579348; }
+        .passi .passo-incompleto { background: #ff3b30; border-color: #a33; color: #fff; }
+        .passi a.attivo.passo-completo { background: #1b5e20; color: #ffeb3b; border-color: #144317; }
+        .passi a.attivo.passo-incompleto { background: #ff3b30; color: #fff; border-color: #a33; }
+        .comandi-fase { display: flex; gap: 6px; margin-left: auto; }
+        .passi .comando-fase { margin-left: 0; }
+        .passi .comando-fase.principale { background: #1b5e20; color: #ffeb3b; border-color: #144317; }
+        .passi .comando-fase.pericolo { background: #ff3b30; color: #fff; border-color: #a33; }
+        .passi .comando-fase.stato-incompleto { background: #ff3b30; color: #fff; border-color: #a33; }
+        .intestazione-step3 { background-color: #ffeb3b; border-left-color: #c5a900; }
+        .lista-obbligatoria.incompleta { background-color: #ff3b30; color: #fff; padding: 3px 8px; }
+        .lista-obbligatoria.completa { background-color: #1b5e20; color: #fff; padding: 3px 8px; }
+        .campo-progressivo { transition: background-color .15s ease; }
+        .form-unita .campo-progressivo.campo-rosso { background-color: #ff3b30 !important; }
+        .form-unita .campo-progressivo.campo-verde { background-color: #b9f6a5 !important; }
+        .form-unita #titolo.campo-rosso { background-color: #ff3b30 !important; }
+        .form-unita #titolo.campo-verde { background-color: #b9f6a5 !important; }
+        .form-unita .campo-progressivo.campo-giallo { background-color: #fff59d !important; }
+        .form-unita .ud-rosso { background-color: #ff3b30 !important; }
+        .form-unita .ud-verde { background-color: #b9f6a5 !important; }
+        .codice-disabilitato { background-color: #eee !important; color: #888; }
+        .form-modulo .campo-altro-spazio { margin-top: 10px; }
+        .form-modulo .campo-altro-spazio label { font-weight: bold; }
+        .form-modulo .campo-altro-spazio.inattivo { display: none; }
+        .form-modulo > fieldset label { font-weight: bold; }
+        .form-unita label { font-weight: bold; }
+        .passi .comando-fase.stato-completo { background: #1b5e20; color: #ffeb3b; border-color: #144317; }
+        .passi .comando-fase.stato-incompleto { background: #ff3b30; color: #fff; border-color: #a33; }
+
+        .intestazione-dati {
+            margin-bottom: 14px;
+            padding: 8px 10px;
+            background: #f4f4f4;
+            border-left: 4px solid #666;
+            font-size: 13px;
+        }
+        .intestazione-step2 { background-color: #ffeb3b; border-left-color: #c5a900; }
+        .riga-stato { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+        .stato-step2 { color: #111; font-size: 11px; font-weight: normal; text-align: right; }
+        .dati-referente { font-weight: bold; }
+        .dati-programmazione { font-weight: bold; }
+        .testo-ridotto { font-size: 11px; font-weight: normal; }
+        .campo-rosso { background-color: #ff3b30 !important; }
+        .campo-verde { background-color: #b9f6a5 !important; }
+        .campo-giallo { background-color: #fff59d !important; }
+        .campo-disabilitato { background-color: #eee !important; color: #888; }
+        .form-modulo #periodo option { background-color: #fff; color: #111; }
+        .avviso-form { margin-top: 8px; color: #a33; font-weight: bold; }
+
+        .passi .disabilitato { color: #888; cursor: not-allowed; }
+
+        fieldset { margin-bottom: 16px; border: 1px solid #999; }
+
+        legend { padding: 0 6px; font-weight: bold; }
+
+        label { display: block; margin-bottom: 4px; }
+
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #888;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        textarea { resize: vertical; }
+
+        .griglia { display: grid; gap: 12px; }
+        .griglia-2 { grid-template-columns: repeat(2, 1fr); }
+        .griglia-3 { grid-template-columns: repeat(3, 1fr); }
+        .griglia-4 { grid-template-columns: repeat(4, 1fr); }
+        .riepilogo-verifiche .griglia-4 {
+            grid-template-columns: 145px minmax(340px, 1fr) 170px 170px;
+            gap: 10px;
+        }
+        .riepilogo-verifiche .griglia-4 label { white-space: nowrap; }
+        .riepilogo-verifiche label { font-weight: bold; }
+        .step1-dati { display: grid; grid-template-columns: minmax(250px, 1.15fr) minmax(0, 2.85fr); gap: 16px; }
+        .step1-dati fieldset { margin: 0; }
+        .step1-dati .disciplina { grid-column: 1 / -1; }
+        .scelte.classi-scelte {
+            grid-template-columns: max-content max-content;
+            grid-template-rows: repeat(3, minmax(24px, auto));
+            column-gap: 60px;
+            align-content: start;
+        }
+        .scelte.classi-scelte label { font-size: 12px; }
+        .identita-etichetta { font-weight: bold; }
+        .classi-scelte .classe-1 { grid-column: 1; grid-row: 1; }
+        .classi-scelte .classe-2 { grid-column: 1; grid-row: 2; }
+        .classi-scelte .classe-3 { grid-column: 2; grid-row: 1; }
+        .classi-scelte .classe-4 { grid-column: 2; grid-row: 2; }
+        .classi-scelte .classe-5 { grid-column: 2; grid-row: 3; }
+        .discipline-scelte { grid-template-columns: repeat(2, 1fr); max-height: 150px; overflow-y: auto; }
+        .discipline-scelte input { width: auto; accent-color: #1b5e20; }
+        .input-identita { transition: background-color .15s ease; }
+        .testo-grassetto { font-weight: bold; }
+        .input-identita.incompleto { background-color: #ff3b30; box-shadow: inset 0 0 0 1000px #ff3b30; }
+        .input-identita.completo { background-color: #b9f6a5; box-shadow: inset 0 0 0 1000px #b9f6a5; }
+        .input-identita:-webkit-autofill { -webkit-text-fill-color: #111; }
+        .gia-presente { background-color: #e6f5ff; }
+        .lista-programmazioni { height: 205px; overflow-y: auto; padding: 10px 8px 6px; font-size: 11px; }
+        .lista-programmazioni table { margin: 8px 0 0; }
+        .lista-programmazioni th, .lista-programmazioni td { padding: 3px 5px; font-weight: bold; }
+        .azioni-programmazione { display: flex; flex-direction: column; gap: 3px; }
+        .azioni-programmazione form, .azioni-programmazione button { width: 100%; }
+        .azioni-programmazione button { padding: 3px 6px; font-size: 11px; }
+        .azioni-programmazione form:first-child button { background: #b9f6a5; border-color: #579348; }
+        .nascosto { display: none !important; }
+        button.principale:disabled, .passi button.comando-fase.principale:disabled { background: #ff3b30; color: #fff; border-color: #a33; cursor: not-allowed; }
+
+        .scelte { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+
+        .scelte.indirizzi-scelte {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-rows: repeat(3, minmax(24px, auto));
+            align-items: center;
+            column-gap: 6px;
+            row-gap: 8px;
+        }
+        .scelte.indirizzi-scelte label { white-space: nowrap; font-size: 12px; }
+        .indirizzi-scelte .indirizzo-1 { grid-column: 1; grid-row: 1; }
+        .indirizzi-scelte .indirizzo-2 { grid-column: 1; grid-row: 2; }
+        .indirizzi-scelte .indirizzo-3 { grid-column: 1; grid-row: 3; }
+        .indirizzi-scelte .indirizzo-4 { grid-column: 2; grid-row: 1; }
+        .indirizzi-scelte .indirizzo-5 { grid-column: 3; grid-row: 2; }
+        .indirizzi-scelte .indirizzo-6 { grid-column: 2; grid-row: 2; }
+        .indirizzi-scelte .indirizzo-7 { grid-column: 2; grid-row: 3; }
+
+        .scelte label, .scelta-inline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .scelte input, .scelta-inline input { width: auto; }
+
+        button, .bottone {
+            padding: 7px 16px;
+            background: #eee;
+            border: 1px solid #666;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #111;
+            display: inline-block;
+        }
+
+        button.principale { background: #1b5e20; color: #fff; border-color: #144317; }
+        #step4 button, #step4 .bottone { font-weight: bold; }
+
+        button.pericolo { background: #fdecea; border-color: #a33; color: #a33; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+
+        th, td { padding: 7px 9px; border: 1px solid #bbb; text-align: left; }
+
+        th { background: #eee; }
+
+        td { font-weight: bold; }
+
+        .avviso { padding: 8px 12px; margin-bottom: 12px; border: 1px solid; }
+        .avviso.info { background: #e8f4ff; border-color: #3a7bbf; }
+        .avviso.errore { background: #fdecea; border-color: #a33; }
+
+        .ok { color: #1b5e20; font-weight: bold; }
+        .ko { color: #a33; font-weight: bold; }
+
+        .nota { color: #555; font-size: 12px; }
+
+        .barra { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+        .barra-step2 { justify-content: flex-end; }
+        @media (max-width: 700px) {
+            .riepilogo-verifiche .griglia-4 { grid-template-columns: 1fr 1fr; }
+            .riepilogo-verifiche .griglia-4 label { white-space: normal; }
+            .step1-dati { grid-template-columns: 1fr; }
+            .step1-dati .disciplina { grid-column: auto; }
+            .classi-scelte { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; }
+            .classi-scelte label { grid-column: auto; grid-row: auto; }
+            .indirizzi-scelte { grid-template-columns: 1fr 1.7fr; grid-template-rows: none; }
+            .indirizzi-scelte label { white-space: normal; }
+            .indirizzi-scelte label { grid-column: auto; grid-row: auto; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="finestra">
+        {% set messaggi = get_flashed_messages(with_categories=true) %}
+        <div class="titolo">{% block intestazione %}PROGRAMMAZIONE DIDATTICA{% endblock %}</div>
+
+        {% if request.endpoint != 'admin' %}
+        <div class="passi">
+            <a href="{{ url_for('step1') }}" class="{{ 'attivo' if request.endpoint == 'step1' }} {{ 'passo-completo' if accesso_step2 else 'passo-incompleto' }} {{ 'uscita-non-salvare' if request.endpoint == 'step2' }}">1. Dati classe</a>
+            {% if accesso_step2 %}
+            <a href="{{ url_for('step2') }}" class="{{ 'attivo' if request.endpoint == 'step2' }} {{ 'passo-completo' if accesso_step3 else 'passo-incompleto' }}">2. Dati generali</a>
+            {% else %}
+            <span class="disabilitato passo-incompleto">2. Dati generali</span>
+            {% endif %}
+            {% if accesso_step3 %}
+            <a href="{{ url_for('step3') }}"
+                class="{{ 'attivo' if request.endpoint in ['step3', 'modulo', 'unita'] }} {{ 'passo-completo' if accesso_step4 else 'passo-incompleto' }} {{ 'uscita-non-salvare' if request.endpoint == 'step2' }}">3. Moduli e U.D.</a>
+            {% else %}
+            <span class="disabilitato passo-incompleto">3. Moduli e U.D.</span>
+            {% endif %}
+            {% if accesso_step4 %}
+            <a href="{{ url_for('step4') }}" class="{{ 'attivo' if request.endpoint == 'step4' }} passo-completo {{ 'uscita-non-salvare' if request.endpoint == 'step2' }}">4. Invio</a>
+            {% else %}
+            <span class="disabilitato passo-incompleto">4. Invio</span>
+            {% endif %}
+            {% if request.endpoint in ['step1', 'step2'] %}
+            <div class="comandi-fase">
+                {% if request.endpoint == 'step1' %}
+                <button type="submit" form="form-step1" class="comando-fase principale" id="avanti" disabled>Avanti &rsaquo;</button>
+                {% else %}
+                <a class="bottone comando-fase uscita-non-salvare" href="{{ url_for('step1') }}">&lsaquo; Indietro</a>
+                <button type="submit" form="form-step2" class="comando-fase principale" id="salva-prosegui">Salva e prosegui &rsaquo;</button>
+                {% endif %}
+            </div>
+            {% elif request.endpoint == 'step3' %}
+            <div class="comandi-fase">
+                <a class="bottone comando-fase" href="{{ url_for('step2') }}">&lsaquo; Indietro</a>
+                {% if accesso_step4 %}
+                <a class="bottone comando-fase principale" href="{{ url_for('step4') }}">Vai all'invio &rsaquo;</a>
+                {% else %}
+                <span class="bottone comando-fase stato-incompleto">Vai all'invio &rsaquo;</span>
+                {% endif %}
+            </div>
+            {% elif request.endpoint == 'modulo' %}
+            <div class="comandi-fase">
+                <a class="bottone comando-fase" href="{{ url_for('step3') }}">&lsaquo; Elenco moduli</a>
+                <button type="submit" form="form-modulo" class="comando-fase principale" id="salva-modulo" disabled>Salva modulo</button>
+            </div>
+            {% elif request.endpoint == 'unita' %}
+            <div class="comandi-fase">
+                <a class="bottone comando-fase" href="{{ url_for('modulo', numero=numero) }}">&lsaquo; Torna al modulo</a>
+                <button type="submit" form="form-unita" class="comando-fase principale" id="salva-unita" disabled>Salva unità didattica</button>
+            </div>
+            {% endif %}
+            {% if ritorno_admin and request.endpoint != 'step1' %}
+            <div class="comandi-fase">
+                <a class="bottone comando-fase" href="{{ url_for('admin_database') }}">Torna ad Admin</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if session.get('contesto') %}
+        <div class="intestazione-dati {{ 'intestazione-step2' if request.endpoint in ['step1', 'step2', 'step3', 'modulo', 'unita', 'step4'] }} {{ 'riga-stato' if request.endpoint == 'step2' }}">
+            <span class="dati-referente">{{ session['contesto']['cognome'] }} {{ session['contesto']['nome'] }}</span>
+            <span class="dati-programmazione">&mdash; {{ session['contesto']['classe'] }} /
+                {{ session['contesto']['indirizzo'] }} / {{ session['contesto']['disciplina'] }}</span>
+        </div>
+        {% endif %}
+
+        {% for categoria, messaggio in messaggi if not (request.endpoint == 'step2' and categoria == 'info') %}
+        <div class="avviso {{ categoria }}">{{ messaggio }}</div>
+        {% endfor %}
+
+        {% block contenuto %}{% endblock %}
+    </div>
+</body>
+
+</html>

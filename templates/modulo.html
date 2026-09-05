@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block titolo %}Modulo {{ numero }}{% endblock %}
+{% block intestazione %}MODULO N. {{ numero }}{% endblock %}
+
+{% block contenuto %}
+<form method="post" id="form-modulo" class="form-modulo">
+    <fieldset>
+        <legend>Dati del modulo</legend>
+        <div class="griglia griglia-2">
+            <div>
+                <label for="titolo">Titolo</label>
+                <input type="text" id="titolo" name="titolo" maxlength="{{ limiti.titolo_modulo }}"
+                    value="{{ mod.titolo | pulito }}" required>
+            </div>
+            <div>
+                <label for="periodo">Periodo di esecuzione</label>
+                <select id="periodo" name="periodo" required>
+                    <option value="" {{ 'selected' if not mod.periodo | pulito }} hidden></option>
+                    {% for periodo in periodi %}
+                    <option value="{{ periodo }}" {{ 'selected' if mod.periodo | pulito == periodo }}>{{ periodo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend class="lista-obbligatoria" data-lista-obbligatoria="spazi">Spazi utilizzati</legend>
+        <div class="scelte">
+            {% for spazio in spazi %}
+            <label><input type="checkbox" name="spazi" value="{{ loop.index }}"
+                    {{ 'checked' if loop.index in mod.spazi }}> {{ spazio }}</label>
+            {% endfor %}
+        </div>
+        <div style="margin-top:10px">
+            <div id="campo-altro-spazio" class="campo-altro-spazio inattivo">
+                <label for="spazi_altro">Specificare gli altri spazi</label>
+                <input type="text" id="spazi_altro" name="spazi_altro" maxlength="{{ limiti.spazi_altro }}"
+                value="{{ mod.spazi_altro }}">
+            </div>
+        </div>
+    </fieldset>
+
+</form>
+
+<fieldset style="margin-top:20px">
+    <legend>Unita' didattiche</legend>
+    <table>
+        <tr>
+            <th style="width:60px">N.</th>
+            <th>Titolo</th>
+            <th style="width:110px">Stato</th>
+            <th style="width:190px"></th>
+        </tr>
+        {% for ud in mod.unita %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ ud.titolo | pulito or "(senza titolo)" }}</td>
+            <td>{% if ud.completa %}<span class="ok">completa</span>{% else %}<span class="ko">da completare</span>{% endif %}</td>
+            <td>
+                <a class="bottone" href="{{ url_for('unita', numero=numero, indice=loop.index) }}">Apri</a>
+                <form method="post" action="{{ url_for('elimina_ud', numero=numero, indice=loop.index) }}"
+                    style="display:inline" onsubmit="return confirm('Eliminare questa unita\' didattica?')">
+                    <button type="submit" class="pericolo">Elimina</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4">Nessuna unita' didattica inserita.</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    {% if mod.unita | length < max_ud %}
+    <form method="post" action="{{ url_for('nuova_ud', numero=numero) }}">
+        <button type="submit" class="testo-grassetto">+ Nuova unita' didattica</button>
+    </form>
+    {% endif %}
+</fieldset>
+<script>
+    const formModulo = document.getElementById("form-modulo");
+    const titoloModulo = document.getElementById("titolo");
+    const periodoModulo = document.getElementById("periodo");
+    const spaziAltro = document.getElementById("spazi_altro");
+    const casellaAltroSpazio = formModulo.querySelector('input[name="spazi"][value="4"]');
+    const campoAltroSpazio = document.getElementById("campo-altro-spazio");
+    const salvaModulo = document.getElementById("salva-modulo");
+    const campoAttivato = new WeakSet();
+
+    function coloraCampo(campo, valido) {
+        campo.classList.toggle("campo-rosso", !valido);
+        campo.classList.toggle("campo-verde", valido);
+    }
+
+    function aggiornaModulo() {
+        coloraCampo(titoloModulo, titoloModulo.value.trim().length >= 3);
+        periodoModulo.classList.toggle("campo-rosso", !periodoModulo.value);
+        periodoModulo.classList.toggle("campo-verde", Boolean(periodoModulo.value));
+        const spaziSelezionati = formModulo.querySelectorAll('input[name="spazi"]:checked').length;
+        const spaziLegend = document.querySelector('[data-lista-obbligatoria="spazi"]');
+        spaziLegend.classList.toggle("completa", Boolean(spaziSelezionati));
+        spaziLegend.classList.toggle("incompleta", !spaziSelezionati);
+        const altroValido = !casellaAltroSpazio.checked || spaziAltro.value.trim().length >= 3;
+        campoAltroSpazio.classList.toggle("inattivo", !casellaAltroSpazio.checked);
+        if (casellaAltroSpazio.checked) {
+            coloraCampo(spaziAltro, spaziAltro.value.trim().length >= 3);
+        } else {
+            spaziAltro.classList.remove("campo-rosso", "campo-verde");
+        }
+        salvaModulo.disabled = titoloModulo.value.trim().length < 3
+            || !periodoModulo.value || !spaziSelezionati || !altroValido;
+    }
+
+    titoloModulo.addEventListener("input", () => { campoAttivato.add(titoloModulo); aggiornaModulo(); });
+    titoloModulo.addEventListener("blur", () => { campoAttivato.add(titoloModulo); aggiornaModulo(); });
+    periodoModulo.addEventListener("change", aggiornaModulo);
+    formModulo.querySelectorAll('input[name="spazi"], #spazi_altro').forEach(campo => {
+        campo.addEventListener("change", aggiornaModulo);
+        campo.addEventListener("input", aggiornaModulo);
+    });
+    formModulo.addEventListener("submit", evento => {
+        campoAttivato.add(titoloModulo);
+        aggiornaModulo();
+        if (salvaModulo.disabled) { evento.preventDefault(); }
+    });
+    aggiornaModulo();
+</script>
+{% endblock %}
