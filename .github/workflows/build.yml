@@ -1,0 +1,37 @@
+name: Compila Multi-Piattaforma
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: Compila per ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configura Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Installa dipendenze e PyInstaller
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+
+    - name: Esegui PyInstaller
+      run: |
+        pyinstaller --onefile tuo_script.py
+
+    - name: Salva l'eseguibile come pacchetto
+      uses: actions/upload-artifact@v4
+      with:
+        name: eseguibile-${{ matrix.os }}
+        path: dist/
