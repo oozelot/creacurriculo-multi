@@ -344,6 +344,15 @@ def converti_pdf(percorso_word: Path) -> Path:
     percorso_pdf.unlink(missing_ok=True)
 
     comandi = [shutil.which("soffice"), shutil.which("libreoffice")]
+    comandi.extend(
+        str(percorso)
+        for percorso in (
+            Path("C:/Program Files/LibreOffice/program/soffice.exe"),
+            Path("C:/Program Files (x86)/LibreOffice/program/soffice.exe"),
+            Path.home() / "AppData/Local/Programs/LibreOffice/program/soffice.exe",
+        )
+        if percorso.is_file()
+    )
     if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").is_file():
         comandi.append("/Applications/LibreOffice.app/Contents/MacOS/soffice")
     eseguibile = next((comando for comando in comandi if comando), None)
