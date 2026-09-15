@@ -184,7 +184,12 @@ def step1():
             prog = modello.carica(**contesto)
             gia_presente = modello.esiste(prog)
             if not gia_presente:
-                modello.salva(prog)
+                try:
+                    percorso = modello.salva(prog)
+                except OSError as errore:
+                    flash(f"Impossibile creare la cartella di lavoro: {errore}", "errore")
+                    return redirect(url_for("step1"))
+                flash(f"Cartella di lavoro creata in: {percorso}", "info")
             session["contesto"] = contesto
             session["stato_step2"] = (
                 "Dati esistenti ricaricati." if gia_presente else "Nuova programmazione creata."
@@ -1010,6 +1015,10 @@ def admin_file_impostazioni_tutti():
     cartelle = []
     for percorso in archivio.file_ricevuti():
         cartelle.append(modello.salva(archivio.leggi_file(percorso)))
+    for record in archivio.elenca():
+        prog = archivio.programmazione(record["id"])
+        if prog is not None:
+            cartelle.append(modello.salva(prog))
     uniche = sorted({str(percorso.parent) for percorso in cartelle})
     flash(
         f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
