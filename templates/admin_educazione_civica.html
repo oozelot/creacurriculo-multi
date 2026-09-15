@@ -50,7 +50,7 @@
                 <tr>
                     <th>{{ riga_completamento.corso }}</th>
                     {% for ore in riga_completamento.ore %}
-                    <td data-completamento-corso="{{ riga_completamento.corso }}" data-completamento-classe="{{ loop.index0 }}" class="{{ 'completamento-verde' if ore >= 30 else 'completamento-giallo' if ore > 0 else 'completamento-rosso' }}">{{ ore }}</td>
+                    <td data-completamento-corso="{{ riga_completamento.corso }}" data-completamento-classe="{{ loop.index0 }}" class="{{ 'completamento-verde' if ore >= 33 else 'completamento-giallo' if ore > 0 else 'completamento-rosso' }}">{{ ore }}</td>
                     {% endfor %}
                 </tr>
             {% endfor %}
@@ -229,8 +229,8 @@
                 const cella = document.querySelector(`[data-completamento-corso="${riga.corso}"][data-completamento-classe="${indice}"]`);
                 if (!cella) return;
                 cella.textContent = String(ore);
-                cella.classList.toggle("completamento-verde", ore >= 30);
-                cella.classList.toggle("completamento-giallo", ore > 0 && ore < 30);
+                cella.classList.toggle("completamento-verde", ore >= 33);
+                cella.classList.toggle("completamento-giallo", ore > 0 && ore < 33);
                 cella.classList.toggle("completamento-rosso", ore === 0);
             });
         });

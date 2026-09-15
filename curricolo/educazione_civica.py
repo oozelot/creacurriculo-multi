@@ -77,7 +77,7 @@ def piano_per_docente(classe: str, indirizzo: str, disciplina: str) -> dict[str,
 def piano_completo(dati: dict[str, Any] | None) -> bool:
     if not dati or not dati.get("voci"):
         return False
-    return all(int(voce.get("ore", 0) or 0) >= 30 for voce in dati["voci"])
+    return all(int(voce.get("ore", 0) or 0) >= 33 for voce in dati["voci"])
 
 
 def piano_disponibile(dati: dict[str, Any] | None) -> bool:
