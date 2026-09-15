@@ -1522,6 +1522,7 @@ def admin_apri():
 
 
 if __name__ == "__main__":
+    prepara_cartelle_admin()
     eseguibile = getattr(sys, "frozen", False)
     if eseguibile:
         threading.Timer(1.0, lambda: webbrowser.open("http://127.0.0.1:5000")).start()
