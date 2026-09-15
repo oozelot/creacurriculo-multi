@@ -13,7 +13,7 @@ import shutil
 import sqlite3
 import unicodedata
 
-from .config import CARTELLA_DATI, FILE_DB, FILE_DB_FACTORY
+from .config import CARTELLA_DATI, FILE_DB, FILE_DB_FACTORY, FILE_DB_FACTORY_ALTERNATIVO
 
 SIGLE_INI_STORICHE = {
     "ALT": "ALTER", "BTC": "BIOTA", "BTV": "BIOTV", "CMT": "COMPM",
@@ -235,12 +235,16 @@ def resetta_database() -> None:
 
 def ripristina_database_factory() -> bool:
     """Sostituisce il database operativo con una copia factory verificata."""
-    if not FILE_DB_FACTORY.is_file():
+    factory = next(
+        (percorso for percorso in (FILE_DB_FACTORY, FILE_DB_FACTORY_ALTERNATIVO) if percorso.is_file()),
+        None,
+    )
+    if factory is None:
         return False
     temporaneo = FILE_DB.with_name(f"{FILE_DB.name}.factory.tmp")
     sicurezza = FILE_DB.with_name("curricolo.prima-factory-reset.db")
     try:
-        with sqlite3.connect(FILE_DB_FACTORY) as conn:
+        with sqlite3.connect(factory) as conn:
             conn.row_factory = sqlite3.Row
             integrita = conn.execute("PRAGMA integrity_check").fetchone()
             if not integrita or integrita[0] != "ok":
@@ -255,7 +259,7 @@ def ripristina_database_factory() -> bool:
                 return False
         if FILE_DB.is_file():
             shutil.copy2(FILE_DB, sicurezza)
-        shutil.copy2(FILE_DB_FACTORY, temporaneo)
+        shutil.copy2(factory, temporaneo)
         os.replace(temporaneo, FILE_DB)
         with connessione() as conn:
             contesti = conn.execute(
