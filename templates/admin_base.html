@@ -275,6 +275,12 @@
             </fieldset>
         </div>
     </div>
+    {% if config.get('ESEGUIBILE') %}
+    <script>
+        setInterval(() => fetch("{{ url_for('heartbeat') }}", { method: "POST", keepalive: true }), 5000);
+        fetch("{{ url_for('heartbeat') }}", { method: "POST", keepalive: true });
+    </script>
+    {% endif %}
 </body>
 
 <div class="attesa-globale nascosta" id="attesa-globale">

@@ -7,6 +7,7 @@ import json
 import shutil
 import sys
 import threading
+import time
 import uuid
 import webbrowser
 from pathlib import Path
@@ -74,6 +75,8 @@ app.config["ESEGUIBILE"] = getattr(sys, "frozen", False)
 
 _CREAZIONI: dict[str, dict[str, object]] = {}
 _CREAZIONI_LOCK = threading.Lock()
+_ULTIMO_HEARTBEAT = time.monotonic()
+_HEARTBEAT_LOCK = threading.Lock()
 
 
 def prepara_cartelle_admin() -> None:
@@ -716,6 +719,23 @@ def chiudi():
         return ("", 204)
     threading.Timer(0.2, os._exit, args=(0,)).start()
     return ("Applicazione chiusa.", 200)
+
+
+@app.route("/heartbeat", methods=["POST"])
+def heartbeat():
+    global _ULTIMO_HEARTBEAT
+    with _HEARTBEAT_LOCK:
+        _ULTIMO_HEARTBEAT = time.monotonic()
+    return ("", 204)
+
+
+def controlla_heartbeat() -> None:
+    while True:
+        time.sleep(5)
+        with _HEARTBEAT_LOCK:
+            inattiva = time.monotonic() - _ULTIMO_HEARTBEAT > 60
+        if inattiva:
+            os._exit(0)
 
 
 def _password_admin_valida(password: str | None) -> bool:
@@ -1544,5 +1564,6 @@ if __name__ == "__main__":
     eseguibile = getattr(sys, "frozen", False)
     porta = 5001 if eseguibile else 5000
     if eseguibile:
+        threading.Thread(target=controlla_heartbeat, daemon=True).start()
         threading.Timer(1.0, lambda: webbrowser.open(f"http://127.0.0.1:{porta}")).start()
     app.run(debug=not eseguibile, port=porta)

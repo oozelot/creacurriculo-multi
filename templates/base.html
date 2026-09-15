@@ -322,6 +322,10 @@
             onsubmit="return confirm('Chiudere CreaCurricoloMulti?');">
             <button type="submit">CHIUDI PROGRAMMA</button>
         </form>
+        <script>
+            setInterval(() => fetch("{{ url_for('heartbeat') }}", { method: "POST", keepalive: true }), 5000);
+            fetch("{{ url_for('heartbeat') }}", { method: "POST", keepalive: true });
+        </script>
         {% endif %}
     </div>
 </body>
