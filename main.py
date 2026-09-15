@@ -44,6 +44,8 @@ from curricolo.config import (
     CARTELLA_ADMIN,
     CARTELLA_ADMIN_INPUT,
     CARTELLA_ADMIN_OUTPUT,
+    CARTELLA_DATI,
+    CARTELLA_LAVORI,
     CARTELLA_RICEVUTI,
     CLASSI,
     COMPETENZE_CITTADINANZA,
@@ -76,6 +78,8 @@ _CREAZIONI_LOCK = threading.Lock()
 def prepara_cartelle_admin() -> None:
     for cartella in (CARTELLA_ADMIN, CARTELLA_ADMIN_INPUT, CARTELLA_RICEVUTI, CARTELLA_ADMIN_OUTPUT):
         cartella.mkdir(parents=True, exist_ok=True)
+    CARTELLA_DATI.mkdir(parents=True, exist_ok=True)
+    CARTELLA_LAVORI.mkdir(parents=True, exist_ok=True)
 
 
 def prepara_sistema() -> None:
@@ -1003,11 +1007,15 @@ def admin_file_impostazioni():
 
 @app.route("/admin/database/file/impostazioni-tutti", methods=["POST"])
 def admin_file_impostazioni_tutti():
-    quanti = 0
+    cartelle = []
     for percorso in archivio.file_ricevuti():
-        modello.salva(archivio.leggi_file(percorso))
-        quanti += 1
-    flash(f"Create le impostazioni di lavoro per {quanti} file.", "info")
+        cartelle.append(modello.salva(archivio.leggi_file(percorso)))
+    uniche = sorted({str(percorso.parent) for percorso in cartelle})
+    flash(
+        f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
+        f"Cartelle docenti create: {len(uniche)}.",
+        "info",
+    )
     return redirect(url_for("admin_database"))
 
 
