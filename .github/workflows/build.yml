@@ -20,10 +20,10 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Configura Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.10'
 
@@ -44,7 +44,7 @@ jobs:
         python -m PyInstaller --clean --noconfirm CreaCurricolo.spec
 
     - name: Salva l'eseguibile come pacchetto
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: eseguibile-creacurricolomulti-${{ matrix.os }}
         path: dist/
@@ -69,7 +69,7 @@ jobs:
 
     steps:
     - name: Scarica gli archivi multipiattaforma
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         pattern: pacchetto-creacurricolomulti-*
         path: release
