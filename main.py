@@ -1533,6 +1533,7 @@ def admin_apri():
 if __name__ == "__main__":
     prepara_cartelle_admin()
     eseguibile = getattr(sys, "frozen", False)
+    porta = 5001 if eseguibile else 5000
     if eseguibile:
-        threading.Timer(1.0, lambda: webbrowser.open("http://127.0.0.1:5000")).start()
-    app.run(debug=not eseguibile)
+        threading.Timer(1.0, lambda: webbrowser.open(f"http://127.0.0.1:{porta}")).start()
+    app.run(debug=not eseguibile, port=porta)
