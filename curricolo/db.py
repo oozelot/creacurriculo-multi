@@ -357,8 +357,9 @@ def ripristina_educazione_civica_backup() -> bool:
     """Ripristina tutti i piani dagli ultimi snapshot memorizzati."""
     with connessione() as conn:
         righe = conn.execute("SELECT corso, classe, dump FROM educazione_civica_backup").fetchall()
-        if not righe:
-            return False
+    if not righe:
+        return _ripristina_educazione_civica_da_factory()
+    with connessione() as conn:
         for riga in righe:
             conn.execute(
                 "DELETE FROM educazione_civica_piani WHERE corso = ? AND classe = ?",
@@ -371,6 +372,34 @@ def ripristina_educazione_civica_backup() -> bool:
                 )
         conn.commit()
     return True
+
+
+def _ripristina_educazione_civica_da_factory() -> bool:
+    """Ricostruisce i piani civici dal factory se manca lo snapshot operativo."""
+    factory = next(
+        (percorso for percorso in (FILE_DB_FACTORY, FILE_DB_FACTORY_ALTERNATIVO) if percorso.is_file()),
+        None,
+    )
+    if factory is None:
+        return False
+    with sqlite3.connect(factory) as origine:
+        origine.row_factory = sqlite3.Row
+        piani = origine.execute(
+            "SELECT corso, classe, articolazione, disciplina, dati FROM educazione_civica_piani"
+        ).fetchall()
+    with connessione() as conn:
+        conn.execute("DELETE FROM educazione_civica_piani")
+        conn.executemany(
+            "INSERT INTO educazione_civica_piani "
+            "(corso, classe, articolazione, disciplina, dati) VALUES (?, ?, ?, ?, ?)",
+            [
+                (riga["corso"], riga["classe"], riga["articolazione"], riga["disciplina"], riga["dati"])
+                for riga in piani
+            ],
+        )
+        conn.commit()
+    inizializza_backup_stato()
+    return bool(piani)
 
 
 def crea_schema(conn: sqlite3.Connection) -> None:
