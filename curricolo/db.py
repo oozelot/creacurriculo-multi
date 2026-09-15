@@ -209,6 +209,27 @@ def inizializza_database() -> None:
             raise RuntimeError("Impossibile ricostruire il catalogo di base.")
     from . import educazione_civica
     educazione_civica.sincronizza_catalogo_file()
+    inizializza_backup_stato()
+
+
+def inizializza_backup_stato() -> None:
+    """Crea gli snapshot iniziali se il database non ne possiede ancora."""
+    with connessione() as conn:
+        pecup_backup = conn.execute("SELECT 1 FROM pecup_backup WHERE id = 1").fetchone()
+        contesti = conn.execute(
+            "SELECT DISTINCT corso, classe FROM educazione_civica_piani"
+        ).fetchall()
+        backup_civica = {
+            (riga["corso"], riga["classe"])
+            for riga in conn.execute(
+                "SELECT corso, classe FROM educazione_civica_backup"
+            )
+        }
+    if pecup_backup is None:
+        backup_pecup_attuali()
+    for riga in contesti:
+        if (riga["corso"], riga["classe"]) not in backup_civica:
+            backup_educazione_civica(riga["corso"], riga["classe"])
 
 
 def resetta_database() -> None:
@@ -261,12 +282,7 @@ def ripristina_database_factory() -> bool:
             shutil.copy2(FILE_DB, sicurezza)
         shutil.copy2(factory, temporaneo)
         os.replace(temporaneo, FILE_DB)
-        with connessione() as conn:
-            contesti = conn.execute(
-                "SELECT DISTINCT corso, classe FROM educazione_civica_piani"
-            ).fetchall()
-        for riga in contesti:
-            backup_educazione_civica(riga["corso"], riga["classe"])
+        inizializza_backup_stato()
         return True
     finally:
         if temporaneo.exists():
