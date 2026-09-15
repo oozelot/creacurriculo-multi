@@ -317,6 +317,12 @@
         {% endfor %}
 
         {% block contenuto %}{% endblock %}
+        {% if config.get('ESEGUIBILE') %}
+        <form method="post" action="{{ url_for('chiudi') }}" class="chiudi-programma"
+            onsubmit="return confirm('Chiudere CreaCurricoloMulti?');">
+            <button type="submit">CHIUDI PROGRAMMA</button>
+        </form>
+        {% endif %}
     </div>
 </body>
 

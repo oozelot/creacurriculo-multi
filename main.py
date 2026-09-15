@@ -70,6 +70,7 @@ NOMI_CLASSI = ["PRIME", "SECONDE", "TERZE", "QUARTE", "QUINTE"]
 app = Flask(__name__)
 app.secret_key = "curricolo-sviluppo-locale"
 app.jinja_env.filters["pulito"] = ripara_mojibake
+app.config["ESEGUIBILE"] = getattr(sys, "frozen", False)
 
 _CREAZIONI: dict[str, dict[str, object]] = {}
 _CREAZIONI_LOCK = threading.Lock()
@@ -707,6 +708,14 @@ def scarica(cartella: str, nome: str):
 def admin():
     session["modalita_admin"] = True
     return redirect(url_for("admin_database"))
+
+
+@app.route("/chiudi", methods=["POST"])
+def chiudi():
+    if not app.config["ESEGUIBILE"]:
+        return ("", 204)
+    threading.Timer(0.2, os._exit, args=(0,)).start()
+    return ("Applicazione chiusa.", 200)
 
 
 def _password_admin_valida(password: str | None) -> bool:
