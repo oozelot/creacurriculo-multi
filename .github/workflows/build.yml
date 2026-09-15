@@ -3,6 +3,12 @@ name: Compila Multi-Piattaforma
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -24,14 +30,52 @@ jobs:
     - name: Installa dipendenze e PyInstaller
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
+        pip install -r requirements.txt
+        python -m pip install pyinstaller
+      shell: bash
+
+    - name: Installa dipendenze Windows
+      if: runner.os == 'Windows'
+      run: python -m pip install pywin32
 
     - name: Esegui PyInstaller
       run: |
-        pyinstaller --onefile main.py
+        python tools/pulisci_build.py
+        python -m PyInstaller --clean --noconfirm CreaCurricolo.spec
 
     - name: Salva l'eseguibile come pacchetto
       uses: actions/upload-artifact@v4
       with:
-        name: eseguibile-${{ matrix.os }}
+        name: eseguibile-creacurricolomulti-${{ matrix.os }}
         path: dist/
+
+    - name: Crea archivio di distribuzione
+      run: |
+        python -c "import shutil; shutil.make_archive('CreaCurricoloMulti-${{ matrix.os }}', 'zip', 'dist', 'CreaCurricoloMulti')"
+
+    - name: Salva archivio di distribuzione
+      uses: actions/upload-artifact@v4
+      with:
+        name: pacchetto-creacurricolomulti-${{ matrix.os }}
+        path: CreaCurricoloMulti-${{ matrix.os }}.zip
+
+  release:
+    name: Pubblica release GitHub
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Scarica gli archivi multipiattaforma
+      uses: actions/download-artifact@v4
+      with:
+        pattern: pacchetto-creacurricolomulti-*
+        path: release
+        merge-multiple: true
+
+    - name: Pubblica la release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release create "${{ github.ref_name }}" release/*.zip --generate-notes --title "CreaCurricoloMulti ${{ github.ref_name }}"
