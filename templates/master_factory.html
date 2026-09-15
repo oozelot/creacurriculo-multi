@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block titolo %}Ripristino factory{% endblock %}
+{% block intestazione %}RIPRISTINO DATABASE FACTORY{% endblock %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Conferma ripristino di fabbrica</legend>
+    <p>Il database operativo verra' sostituito con il database factory. I dati attuali saranno conservati in una copia di sicurezza.</p>
+    <form method="post" onsubmit="return confirm('Sostituire il database attuale con il database factory?');">
+        <label for="password-master">Password MASTER</label>
+        <input type="password" id="password-master" name="password" autocomplete="off" required>
+        <button type="submit">RIPRISTINA DATABASE FACTORY</button>
+    </form>
+</fieldset>
+{% endblock %}

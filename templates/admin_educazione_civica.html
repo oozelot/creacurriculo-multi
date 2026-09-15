@@ -1,0 +1,392 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Gestione Educazione civica</legend>
+
+    <form method="post" action="{{ url_for('admin_crea_educazione_civica') }}" data-creazione-documento class="azioni-documento">
+        <input type="hidden" name="corso" value="{{ corso }}">
+        <input type="hidden" name="classe" value="{{ classe }}">
+        <div class="barra">
+            <button type="submit" name="formato" value="word">Crea documento Word</button>
+            <button type="submit" name="formato" value="pdf" formaction="{{ url_for('admin_crea_educazione_civica', formato='pdf') }}">Crea documento PDF</button>
+        </div>
+    </form>
+
+    <form method="get" id="filtro-educazione">
+        <div class="selettori-compatti">
+            <fieldset class="frame-corso">
+                <legend>Tipo di corso</legend>
+                {% for voce in corsi %}
+                <label class="scelta"><input type="radio" name="corso" value="{{ voce }}"
+                    {{ 'checked' if corso == voce }} onchange="this.form.submit()"> {{ voce }}</label>
+                {% endfor %}
+            </fieldset>
+            <fieldset class="frame-anno">
+                <legend>Anno di corso</legend>
+                {% for voce in classi %}
+                <label class="scelta"><input type="radio" name="classe" value="{{ voce }}"
+                    {{ 'checked' if classe == voce }} onchange="this.form.submit()"> {{ voce }}</label>
+                {% endfor %}
+            </fieldset>
+        </div>
+    </form>
+
+    <fieldset class="frame-completamento">
+        <legend>Completamento</legend>
+        <table class="elenco tabella-completamento">
+            <thead>
+                <tr>
+                    <th>Tipo di corso</th>
+                    <th>PRIMA</th>
+                    <th>SECONDA</th>
+                    <th>TERZA</th>
+                    <th>QUARTA</th>
+                    <th>QUINTA</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for riga_completamento in completamento %}
+                <tr>
+                    <th>{{ riga_completamento.corso }}</th>
+                    {% for ore in riga_completamento.ore %}
+                    <td data-completamento-corso="{{ riga_completamento.corso }}" data-completamento-classe="{{ loop.index0 }}" class="{{ 'completamento-verde' if ore >= 30 else 'completamento-giallo' if ore > 0 else 'completamento-rosso' }}">{{ ore }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </fieldset>
+
+    <form method="post" id="piano-educazione">
+        <input type="hidden" name="corso" value="{{ corso }}">
+        <input type="hidden" name="classe" value="{{ classe }}">
+        <input type="hidden" name="configurazioni" id="configurazioni-educazione" value="{}">
+        <input type="hidden" name="azione" value="salva">
+
+        <div class="colonne">
+            <fieldset style="flex: 1 1 100%; min-width: 360px;">
+                <legend>Discipline del corso e dell'anno: {{ corso }} {{ classe }}</legend>
+                {% for riga in righe %}
+                <div class="riga-disciplina" data-disciplina="{{ riga.disciplina }}">
+                    <div class="scelta compatta"><input type="checkbox" name="disciplina" value="{{ riga.disciplina }}" {{ 'checked' if riga.attiva }}> <span class="nome-disciplina-apri" role="button" tabindex="0">{{ riga.disciplina }}</span></div>
+                    <strong class="totale-riga" data-totale-riga>0 ore</strong>
+                    <span class="riepilogo-disciplina" data-riepilogo>nessuna voce selezionata</span>
+                </div>
+                {% else %}
+                <p class="nota">Nessuna disciplina prevista per questa combinazione.</p>
+                {% endfor %}
+            </fieldset>
+
+        </div>
+
+        <div class="pannello-voci" id="pannello-voci" hidden>
+            <div class="testata-pannello"><strong id="titolo-disciplina"></strong><span>cliccare fuori per chiudere</span></div>
+            <div class="colonne-macroaree">
+                {% for nome in macroaree %}
+                <fieldset class="colonna-macroarea">
+                    <label class="scelta macroarea-titolo"><input type="radio" name="macroarea-ui" value="{{ nome }}"> {{ nome }}</label>
+                    <div data-voci-macroarea="{{ nome }}"></div>
+                </fieldset>
+                {% endfor %}
+            </div>
+            <div class="ore-totali-pannello">Ore totali disciplina <strong id="ore-disciplina-pannello">0</strong></div>
+        </div>
+
+    </form>
+    {% if documento or documento_word %}
+    <div class="barra" style="flex-direction: column; align-items: flex-start;">
+        {% if documento %}
+        <div class="barra">
+            <span>Documento creato: <strong>{{ documento }}</strong></span>
+            <form method="post" action="{{ url_for('admin_apri') }}">
+                <input type="hidden" name="nome" value="{{ documento }}">
+                <button type="submit">Apri PDF</button>
+            </form>
+            <a class="bottone" href="{{ url_for('admin_scarica', nome=documento) }}">Scarica PDF</a>
+        </div>
+        {% endif %}
+        {% if documento_word and documento_word != documento %}
+        <div class="barra">
+            <span>Documento Word: <strong>{{ documento_word }}</strong></span>
+            <form method="post" action="{{ url_for('admin_apri') }}">
+                <input type="hidden" name="nome" value="{{ documento_word }}">
+                <button type="submit">Apri Word</button>
+            </form>
+            <a class="bottone" href="{{ url_for('admin_scarica', nome=documento_word) }}">Scarica Word</a>
+        </div>
+        {% endif %}
+    </div>
+    <div class="popup-apertura" role="dialog" aria-modal="true" aria-labelledby="titolo-popup-apertura">
+        <div class="popup-apertura-finestra">
+            <strong id="titolo-popup-apertura">Desideri aprire il file generato?</strong>
+            <p>Premi OK per aprire il documento.</p>
+            <form method="post" action="{{ url_for('admin_apri') }}">
+                <input type="hidden" name="nome" value="{{ documento or documento_word }}">
+                <div class="popup-apertura-comandi">
+                    <button type="submit">OK, apri</button>
+                    <button type="button" id="chiudi-popup-apertura">Annulla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        document.getElementById("chiudi-popup-apertura")?.addEventListener("click", () => {
+            document.querySelector(".popup-apertura")?.remove();
+        });
+    </script>
+    {% endif %}
+</fieldset>
+<style>
+    .selettori-compatti { display: flex; align-items: flex-start; gap: 8px; flex-wrap: nowrap; }
+    .selettori-compatti fieldset { flex: 0 0 auto; width: fit-content; padding: 4px 7px; white-space: nowrap; }
+    .selettori-compatti .scelta { display: inline-flex; margin: 0 9px 0 0; white-space: nowrap; font-size: 10px; }
+    .selettori-compatti .frame-corso { min-width: 255px; }
+    .selettori-compatti .frame-anno { min-width: 405px; }
+    .frame-completamento { margin: 10px 0; }
+    .azioni-documento { margin: 8px 0 12px; padding: 8px 0; border-top: 1px solid #b4b4b4; border-bottom: 1px solid #b4b4b4; }
+    .tabella-completamento { table-layout: fixed; }
+    .tabella-completamento th, .tabella-completamento td { text-align: center; vertical-align: middle; }
+    .tabella-completamento th:first-child { width: 150px; text-align: left; }
+    .tabella-completamento td { font-size: 12px; font-weight: bold; }
+    .tabella-completamento .completamento-rosso { background: #c62828; color: #fff; }
+    .tabella-completamento .completamento-giallo { background: #f9a825; color: #000; }
+    .tabella-completamento .completamento-verde { background: #1b5e20; color: #fff; }
+    .riga-disciplina { display: grid; grid-template-columns: minmax(190px, 25%) 70px minmax(0, 1fr); gap: 8px; align-items: start; padding: 4px 0; border-bottom: 1px solid #ddd; font-size: 11px; font-weight: bold; }
+    .scelta.compatta { display: flex; align-items: flex-start; gap: 5px; margin: 0; }
+    .scelta.compatta span { overflow-wrap: anywhere; }
+    .riepilogo-disciplina { min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; font-size: 10px; font-weight: bold; }
+    .macroarea-riepilogo { text-transform: uppercase; }
+    .macroarea-riepilogo { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(78px, 90px)); gap: 5px; align-items: center; text-transform: uppercase; }
+    .macroarea-riepilogo.riepilogo-singolo { grid-template-columns: minmax(0, 1fr) minmax(78px, 90px); }
+    .macroarea-riepilogo .intestazione-articolazione { display: block; min-width: 0; width: 100%; text-align: center; font-size: 9px; }
+    .voce-riepilogo { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(78px, 90px)); gap: 5px; align-items: start; padding-left: 0; font-weight: normal; }
+    .voce-riepilogo.riepilogo-singolo { grid-template-columns: minmax(0, 1fr) minmax(78px, 90px); }
+    .voce-riepilogo > span:first-child { padding-left: 0; }
+    .voce-riepilogo .semaforo { min-width: 0; width: 100%; min-height: 18px; height: auto; padding: 2px 3px; white-space: nowrap; font-size: 8px; text-align: center; }
+    .totale-riga { white-space: nowrap; text-align: center; font-size: 10px; }
+    .pannello-voci { position: fixed; z-index: 1000; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(900px, 94vw); max-height: 82vh; overflow: auto; padding: 10px; background: #fff; border: 2px solid #333; box-shadow: 0 4px 18px rgba(0,0,0,.35); }
+    .pannello-voci[hidden] { display: none; }
+    .testata-pannello { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 7px; border-bottom: 1px solid #999; font-size: 11px; }
+    .testata-pannello span { color: #555; font-weight: normal; }
+    .colonne-macroaree { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 8px; }
+    .colonna-macroarea { min-width: 0; margin: 0; padding: 5px; }
+    .macroarea-titolo { margin-bottom: 6px; white-space: normal; }
+    .voce-macroarea { display: grid; grid-template-columns: minmax(0, 1fr) 58px; gap: 4px; align-items: center; margin: 3px 0; font-size: 10px; font-weight: bold; }
+    .voce-macroarea input { width: 58px; appearance: textfield; -moz-appearance: textfield; }
+    .voce-macroarea input::-webkit-outer-spin-button, .voce-macroarea input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .ore-totali-pannello { display: flex; justify-content: flex-end; align-items: center; gap: 7px; margin-top: 8px; font-size: 11px; }
+    .semaforo { display: inline-block; min-width: 90px; padding: 3px 5px; text-align: center; border: 1px solid #333; font-weight: bold; }
+    .semaforo.verde { background: #1b5e20; color: #fff; }
+    .semaforo.rosso { background: #c62828; color: #fff; }
+    .semaforo.inattivo { background: #4a4a4a; color: #fff; }
+    .popup-apertura { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .4); }
+    .popup-apertura-finestra { min-width: 320px; padding: 18px; border: 2px solid #333; background: #fff; text-align: center; }
+    .popup-apertura-finestra p { margin: 10px 0 14px; }
+    .popup-apertura-comandi { display: flex; justify-content: center; gap: 8px; }
+</style>
+<script>
+    const vociMacroaree = {{ macroaree | tojson }};
+    const configurazioni = {};
+    const pannello = document.getElementById("pannello-voci");
+    const titoloDisciplina = document.getElementById("titolo-disciplina");
+    const oreDisciplina = document.getElementById("ore-disciplina-pannello");
+    let disciplinaAperta = "";
+    const righeDisciplina = document.querySelectorAll(".riga-disciplina");
+    const datiPiani = {{ piani | tojson }};
+    const datiStatiVoci = {{ stati_voci | tojson }};
+    const articolazioniVisualizzate = {{ articolazioni_visualizzate | tojson }};
+    const corsoCorrente = {{ corso | tojson }};
+    const classeCorrente = {{ classe | tojson }};
+    const urlSalva = {{ url_for('admin_salva_educazione_civica') | tojson }};
+    const macroareaVoce = Object.fromEntries(
+        Object.entries(vociMacroaree).flatMap(([macroarea, voci]) => voci.map(voce => [voce.toLocaleLowerCase(), macroarea]))
+    );
+    let salvataggioTimer = null;
+    let salvataggioInCorso = Promise.resolve();
+
+    function creaConfigurazione(disciplina) {
+        if (!configurazioni[disciplina]) {
+            const piano = datiPiani[disciplina] || {};
+            const vociUniche = new Map();
+            (piano.voci || [])
+                .map(voce => ({ ...voce, macroarea: macroareaVoce[String(voce.voce || "").toLocaleLowerCase()] || "" }))
+                .filter(voce => voce.macroarea)
+                .forEach(voce => {
+                    const chiave = String(voce.voce || "").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+                    const precedente = vociUniche.get(chiave);
+                    if (!precedente || Number(voce.ore || 0) > Number(precedente.ore || 0)) vociUniche.set(chiave, voce);
+                });
+            const voci = [...vociUniche.values()];
+            const totaleVoci = voci.reduce((somma, voce) => somma + Number(voce.ore || 0), 0);
+            configurazioni[disciplina] = { macroarea: piano.macroarea || "", voci, conferme: piano.conferme || {}, ore_disciplina: totaleVoci };
+        }
+        return configurazioni[disciplina];
+    }
+    function aggiornaTabellaCompletamento(righe) {
+        righe.forEach(riga => {
+            riga.ore.forEach((ore, indice) => {
+                const cella = document.querySelector(`[data-completamento-corso="${riga.corso}"][data-completamento-classe="${indice}"]`);
+                if (!cella) return;
+                cella.textContent = String(ore);
+                cella.classList.toggle("completamento-verde", ore >= 30);
+                cella.classList.toggle("completamento-giallo", ore > 0 && ore < 30);
+                cella.classList.toggle("completamento-rosso", ore === 0);
+            });
+        });
+    }
+    async function salvaConfigurazione(disciplina) {
+        const config = creaConfigurazione(disciplina);
+        salvataggioInCorso = salvataggioInCorso.then(async () => {
+            try {
+                const risposta = await fetch(urlSalva, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ corso: corsoCorrente, classe: classeCorrente, disciplina, articolazione: document.querySelector("input[name=articolazione]:checked")?.value || "COMUNE", configurazione: config }),
+                });
+                const risultato = await risposta.json();
+                if (risposta.ok && risultato.ok) aggiornaTabellaCompletamento(risultato.completamento);
+            } catch (errore) {
+                console.error("Salvataggio automatico non riuscito", errore);
+            }
+        });
+        return salvataggioInCorso;
+    }
+    function programmaSalvataggio(disciplina) {
+        window.clearTimeout(salvataggioTimer);
+        salvataggioTimer = window.setTimeout(() => salvaConfigurazione(disciplina), 250);
+    }
+    function raccogliConfigurazione() {
+        if (!disciplinaAperta) return null;
+        const config = creaConfigurazione(disciplinaAperta);
+        config.macroarea = document.querySelector("input[name=macroarea-ui]:checked")?.value || "";
+        const vociPerMacroarea = new Map();
+        document.querySelectorAll("[data-voci-macroarea]").forEach(contenitore => {
+            const macroarea = contenitore.dataset.vociMacroarea;
+            const voci = [];
+            contenitore.querySelectorAll("input[data-voce]").forEach(input => {
+                const ore = Number(input.value) || 0;
+                if (ore > 0) voci.push({ macroarea, voce: input.dataset.voce, ore });
+            });
+            vociPerMacroarea.set(macroarea, voci);
+        });
+        config.voci = [...vociPerMacroarea.values()].flat();
+        config.ore_disciplina = config.voci.reduce((somma, voce) => somma + Number(voce.ore || 0), 0);
+        document.getElementById("configurazioni-educazione").value = JSON.stringify(configurazioni);
+        aggiornaRiepilogo(disciplinaAperta);
+        return config;
+    }
+    function aggiornaRiepilogo(disciplina) {
+        const riga = document.querySelector(`[data-disciplina="${CSS.escape(disciplina)}"]`);
+        const config = creaConfigurazione(disciplina);
+        const selezionate = config.voci.filter(voce => Number(voce.ore) > 0);
+        const totale = config.voci.reduce((somma, voce) => somma + Number(voce.ore || 0), 0);
+        riga.querySelector("input[type=checkbox]").checked = totale > 0;
+        const riepilogo = riga.querySelector("[data-riepilogo]");
+        riepilogo.replaceChildren();
+        if (!selezionate.length) {
+            riepilogo.textContent = "nessuna voce selezionata";
+        } else {
+            const gruppi = new Map();
+            selezionate.forEach(voce => {
+                const macroareaVoce = voce.macroarea || config.macroarea || "macroarea non selezionata";
+                if (!gruppi.has(macroareaVoce)) gruppi.set(macroareaVoce, []);
+                gruppi.get(macroareaVoce).push(voce);
+            });
+            gruppi.forEach((vociGruppo, macroareaVoce) => {
+                const intestazione = document.createElement("div");
+                intestazione.className = `macroarea-riepilogo ${articolazioniVisualizzate.length === 3 ? "riepilogo-triennio" : "riepilogo-singolo"}`;
+                const testoMacroarea = document.createElement("span");
+                testoMacroarea.textContent = macroareaVoce;
+                intestazione.appendChild(testoMacroarea);
+                articolazioniVisualizzate.forEach(articolazione => {
+                    const titoloArticolazione = document.createElement("span");
+                    titoloArticolazione.className = "intestazione-articolazione";
+                    titoloArticolazione.textContent = articolazione === "COMUNE" ? "PERIODO" : articolazione;
+                    intestazione.appendChild(titoloArticolazione);
+                });
+                riepilogo.appendChild(intestazione);
+                vociGruppo.forEach(voce => {
+                const rigaVoce = document.createElement("div");
+                rigaVoce.className = `voce-riepilogo ${articolazioniVisualizzate.length === 3 ? "riepilogo-triennio" : "riepilogo-singolo"}`;
+                const testoVoce = document.createElement("span");
+                testoVoce.textContent = `- ${voce.voce} (${voce.ore})`;
+                rigaVoce.appendChild(testoVoce);
+                const stati = datiStatiVoci[disciplina]?.[voce.voce] || {};
+                articolazioniVisualizzate.forEach(articolazione => {
+                    const semaforo = document.createElement("span");
+                    const dettaglio = stati[articolazione] || { stato: "rosso", testo: "DA CONFERMARE" };
+                    semaforo.className = `semaforo ${dettaglio.stato}`;
+                    semaforo.textContent = dettaglio.testo;
+                    semaforo.title = dettaglio.stato === "verde" ? "Periodo docente compilato" : dettaglio.stato === "inattivo" ? "Articolazione non presente" : "Periodo docente da compilare";
+                    semaforo.setAttribute("aria-label", semaforo.title);
+                    rigaVoce.appendChild(semaforo);
+                });
+                riepilogo.appendChild(rigaVoce);
+                });
+            });
+        }
+        riga.querySelector("[data-totale-riga]").textContent = `${totale} ore`;
+    }
+    function mostraPannello(disciplina) {
+        disciplinaAperta = disciplina;
+        const config = creaConfigurazione(disciplina);
+        titoloDisciplina.textContent = disciplina;
+        oreDisciplina.textContent = String(config.ore_disciplina || 0);
+        document.querySelectorAll("[data-voci-macroarea]").forEach(contenitore => {
+            const nome = contenitore.dataset.vociMacroarea;
+            contenitore.replaceChildren(...vociMacroaree[nome].map(voce => {
+                const esistente = config.voci.find(elemento => elemento.voce === voce && elemento.macroarea === nome);
+                const label = document.createElement("label");
+                label.className = "voce-macroarea";
+                label.innerHTML = `<span>${voce}</span><input type="text" inputmode="numeric" pattern="[0-9]*" value="${esistente?.ore || ""}" data-voce="${voce}" autocomplete="off">`;
+                return label;
+            }));
+            const radio = contenitore.parentElement.querySelector("input[type=radio]");
+            radio.checked = config.macroarea === nome;
+            contenitore.hidden = config.macroarea !== nome;
+            radio.onchange = () => {
+                document.querySelectorAll("[data-voci-macroarea]").forEach(elemento => {
+                    elemento.hidden = elemento.dataset.vociMacroarea !== radio.value;
+                });
+                raccogliConfigurazione();
+                programmaSalvataggio(disciplinaAperta);
+            };
+        });
+        pannello.hidden = false;
+    }
+    function chiudiPannello() {
+        if (!disciplinaAperta) return;
+        const config = raccogliConfigurazione();
+        oreDisciplina.textContent = String(config.ore_disciplina);
+        pannello.hidden = true;
+        disciplinaAperta = "";
+    }
+    righeDisciplina.forEach(riga => {
+        const disciplina = riga.dataset.disciplina;
+        const check = riga.querySelector("input[type=checkbox]");
+        const nomeDisciplina = riga.querySelector(".nome-disciplina-apri");
+        check.addEventListener("change", () => check.checked ? mostraPannello(disciplina) : null);
+        const apriDaNome = evento => {
+            evento.preventDefault();
+            evento.stopPropagation();
+            mostraPannello(disciplina);
+        };
+        nomeDisciplina.addEventListener("click", apriDaNome);
+        nomeDisciplina.addEventListener("keydown", evento => {
+            if (evento.key === "Enter" || evento.key === " ") apriDaNome(evento);
+        });
+        aggiornaRiepilogo(disciplina);
+    });
+    pannello.addEventListener("click", evento => evento.stopPropagation());
+    document.addEventListener("click", evento => { if (!pannello.hidden && !pannello.contains(evento.target)) chiudiPannello(); });
+    pannello.addEventListener("input", evento => {
+        if (!evento.target.matches("input[data-voce]")) return;
+        evento.target.value = evento.target.value.replace(/[^0-9]/g, "");
+        const config = raccogliConfigurazione();
+        programmaSalvataggio(disciplinaAperta);
+        oreDisciplina.textContent = String(config?.ore_disciplina || 0);
+    });
+    document.querySelector("#piano-educazione").addEventListener("submit", () => { if (!pannello.hidden) chiudiPannello(); });
+</script>
+{% endblock %}
