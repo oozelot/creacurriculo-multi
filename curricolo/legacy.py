@@ -19,6 +19,7 @@ letto e scritto da Form2/Form3 e riversato nel file di invio da da_form4.bas.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,10 @@ from .config import (
 
 RIGHE_DATIBASE = 55
 RIGHE_MODULO = 9
-RIGHE_UD = 73
+# Il tracciato VB6 originario prevedeva 74 righe; le 4 righe aggiuntive sotto
+# conservano i dati di Educazione civica per non perdere la selezione del docente
+# al riaprire la singola UDA.
+RIGHE_UD = 78
 
 # Cartelle di progetto da non confondere con quelle dei docenti.
 CARTELLE_RISERVATE = {
@@ -122,7 +126,8 @@ def _leggi_unita(percorso: Path) -> dict[str, Any]:
         "titolo": righe[0],
         "argomenti": da_multiline(righe[1]),
         "prerequisiti": da_multiline(righe[2]),
-        "multidisciplinare": _posizioni_valorizzate(righe[3:7]),
+        "multidisciplinare": _posizioni_valorizzate(righe[3:7])
+        + ([5] if righe[73].strip() else []),
         "multidisciplinare_altro": righe[7],
         "abilita": [da_multiline(v) for v in righe[8:17]],
         "codici_abilita": righe[17:26],
@@ -135,6 +140,10 @@ def _leggi_unita(percorso: Path) -> dict[str, Any]:
         "competenze_minime": da_multiline(righe[70]),
         "competenze_intermedie": da_multiline(righe[71]),
         "competenze_avanzate": da_multiline(righe[72]),
+        "ec_voci": [v.strip() for v in (righe[74].split("@") if len(righe) > 74 else []) if v.strip()],
+        "ec_ore": righe[75].strip() if len(righe) > 75 else "",
+        "ec_periodo": righe[76].strip() if len(righe) > 76 else "",
+        "ec_quadrimestre": righe[77].strip() if len(righe) > 77 else "",
     }
 
 
@@ -222,6 +231,15 @@ def _righe_unita(ud: dict[str, Any]) -> list[str]:
     righe.append(a_multiline(ud.get("competenze_minime", "")))
     righe.append(a_multiline(ud.get("competenze_intermedie", "")))
     righe.append(a_multiline(ud.get("competenze_avanzate", "")))
+    righe.append(
+        MULTIDISCIPLINARE[4]
+        if 5 in [int(n) for n in ud.get("multidisciplinare") or []]
+        else ""
+    )
+    righe.append("@".join(str(v).strip() for v in (ud.get("ec_voci") or []) if str(v).strip()))
+    righe.append((ud.get("ec_ore") or "").strip())
+    righe.append((ud.get("ec_periodo") or "").strip())
+    righe.append((ud.get("ec_quadrimestre") or "").strip())
     return righe
 
 
@@ -305,7 +323,7 @@ def scrivi_lavoro(dati: dict[str, Any]) -> Path:
 
 
 def _ripulisci_residui(cartella_moduli: Path, moduli: list[dict[str, Any]]) -> None:
-    """Svuota i file dei moduli/UD eliminati, senza rimuovere le cartelle."""
+    """Svuota i file dei moduli/UDA eliminati, senza rimuovere le cartelle."""
     if not cartella_moduli.exists():
         return
     for cartella in cartella_moduli.glob("modulo*"):
@@ -357,3 +375,25 @@ def elenca_lavori() -> list[dict[str, str]]:
                 }
             )
     return trovati
+
+
+def elimina_cartelle_lavoro() -> int:
+    """Elimina le cartelle utente create dal programma e restituisce il conteggio."""
+    eliminate = 0
+    if not CARTELLA_LAVORI.exists():
+        return eliminate
+
+    for cartella in CARTELLA_LAVORI.iterdir():
+        if not cartella.is_dir() or cartella.name.lower() in CARTELLE_RISERVATE:
+            continue
+        if "_" not in cartella.name:
+            continue
+        contiene_dati = any(
+            (corso / "do_not_use").is_dir() or (corso / "da_inviare").is_dir()
+            for corso in cartella.iterdir()
+            if corso.is_dir()
+        )
+        if contiene_dati:
+            shutil.rmtree(cartella)
+            eliminate += 1
+    return eliminate

@@ -38,17 +38,23 @@
         }
 
         .corpo {
-            display: grid;
-            grid-template-columns: minmax(0, 800px) 260px;
+            display: flex;
             gap: 10px;
             padding: 10px;
-            align-items: start;
+            align-items: stretch;
+            font-weight: bold;
         }
 
-        .corpo > div { min-width: 0; }
+        .corpo > div {
+            flex: 1 1 auto;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-self: stretch;
+        }
 
         fieldset {
-            margin: 0 0 10px;
+            margin: 0;
             padding: 10px 12px 12px;
             border: 1px solid #9a9a9a;
             background: #fff;
@@ -101,7 +107,26 @@
 
         button:disabled { color: #909090; cursor: default; }
 
-        .pannello-comandi { position: sticky; top: 10px; }
+        .pannello-comandi {
+            flex: 0 0 260px;
+            position: sticky;
+            top: 10px;
+            display: flex;
+            flex-direction: column;
+            height: auto;
+            min-height: 0;
+            margin: 0;
+            align-self: stretch;
+        }
+
+        .pannello-comandi .reset-tools {
+            margin-top: auto;
+            padding-top: 24px;
+            border-top: 1px solid #dcdcdc;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
 
         .pannello-comandi .voce {
             display: block;
@@ -161,13 +186,19 @@
         .avviso.info { background: #eaf3ff; border-color: #3a7bbf; }
         .avviso.errore { background: #ffecec; border-color: #a33; }
 
+        .selezione-stato > legend { padding: 3px 6px; }
+        .selezione-stato.incompleta > legend { background: #ff3b30; color: #fff; }
+        .selezione-stato.completa > legend { background: #1b5e20; color: #fff; }
+        .pannello-comandi > legend { background: #ffeb3b; color: #111; }
+
         .nota { color: #4a4a4a; }
 
         .barra { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
         .barra form { display: flex; gap: 8px; flex-wrap: wrap; }
         .attesa-globale { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); z-index: 100; }
         .attesa-globale.nascosta { display: none; }
-        .attesa-globale .messaggio { padding: 16px 22px; border: 2px solid #000; background: #fff; font-size: 12px; font-weight: bold; }
+        .attesa-globale .messaggio { padding: 16px 22px; border: 2px solid #000; background: #fff; font-size: 12px; font-weight: bold; text-align: center; }
+        .attesa-globale .messaggio span { display: block; margin-top: 6px; }
         @media (max-width: 900px) {
             .corpo { grid-template-columns: 1fr; }
             .pannello-comandi { position: static; }
@@ -196,6 +227,8 @@
                     href="{{ url_for('admin_database') }}" data-attesa>GESTIONE DATABASE</a>
                 <a class="voce {{ 'attiva' if sezione == 'materie' }}"
                     href="{{ url_for('admin_materie') }}" data-attesa>GESTIONE MATERIE</a>
+                <a class="voce {{ 'attiva' if sezione == 'educazione-civica' }}"
+                    href="{{ url_for('admin_educazione_civica') }}" data-attesa>GESTISCI EDUCAZIONE CIVICA</a>
 
                 <div class="gruppo">CREARE DOCUMENTI DI ISTITUTO</div>
 
@@ -204,7 +237,7 @@
                     europea</a>
                 <a class="voce {{ 'attiva' if sezione == 'multidisciplinare' }}"
                     href="{{ url_for('admin_multidisciplinare') }}" data-attesa>Progettazione per competenze per
-                    aree multidisciplinari (esempio educazione civica)</a>
+                    aree multidisciplinari</a>
 
                 <div style="height:10px"></div>
 
@@ -213,18 +246,47 @@
                     dati</a>
                 <a class="voce" href="{{ url_for('step1') }}">USCIRE DA MODALITA' ADMIN</a>
 
-                <form method="post" action="{{ url_for('admin_reset') }}"
-                    onsubmit="return confirm('Saranno eliminati definitivamente ADMIN, il database locale e tutti i dati ricevuti. Confermare l\'azzeramento?');">
-                    <button type="submit">AZZERA LAVORO E DATI</button>
-                </form>
+                <div class="reset-tools">
+                    <form method="post" action="{{ url_for('admin_reset') }}"
+                        onsubmit="var password=prompt('Password admin per azzerare lavori e dati'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
+                        <input type="hidden" name="password" value="">
+                        <button type="submit">AZZERA LAVORI E DATI</button>
+                    </form>
+                    <form method="post" action="{{ url_for('admin_reset_pecup') }}"
+                        onsubmit="var password=prompt('Password admin per reset codici PECUP allo stato iniziale'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
+                        <input type="hidden" name="password" value="">
+                        <button type="submit">RESET CODICI E SITUAZIONE ALLO STATO INIZIALE</button>
+                    </form>
+                    <form method="post" action="{{ url_for('admin_memorizza_pecup') }}"
+                        onsubmit="if(!confirm('ATTENZIONE: I DATI PECUP ATTUALI SOSTITUIRANNO QUELLI DELLO STATO INIZIALE.\n\nPremere OK per procedere, Annulla per tornare indietro.')){ return false; } var password=prompt('Password admin per memorizzare i codici PECUP'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
+                        <input type="hidden" name="password" value="">
+                        <button type="submit">MEMORIZZA CODICI PECUP</button>
+                    </form>
+                    {% if sezione == 'educazione-civica' %}
+                    <form method="post" action="{{ url_for('admin_memorizza_educazione_civica') }}"
+                        onsubmit="if(!confirm('Memorizzare la situazione attuale di Educazione civica per questo corso e anno?')){ return false; } var password=prompt('Password admin per memorizzare la situazione Educazione civica'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
+                        <input type="hidden" name="corso" value="{{ corso }}">
+                        <input type="hidden" name="classe" value="{{ classe }}">
+                        <input type="hidden" name="password" value="">
+                        <button type="submit">MEMORIZZA SITUAZIONE EDUCAZIONE CIVICA</button>
+                    </form>
+                    {% endif %}
+                </div>
             </fieldset>
         </div>
     </div>
 </body>
 
-<div class="attesa-globale nascosta" id="attesa-globale"><div class="messaggio">ATTENDERE...</div></div>
+<div class="attesa-globale nascosta" id="attesa-globale">
+    <div class="messaggio">
+        <strong id="testo-attesa">ATTENDERE...</strong>
+        <span id="dettaglio-attesa"></span>
+    </div>
+</div>
 <script>
     const attesaGlobale = document.getElementById("attesa-globale");
+    const testoAttesa = document.getElementById("testo-attesa");
+    const dettaglioAttesa = document.getElementById("dettaglio-attesa");
     function mostraAttesa() {
         attesaGlobale.classList.remove("nascosta");
         document.querySelectorAll("button, input[type='submit']").forEach(comando => {
@@ -232,7 +294,16 @@
         });
     }
     document.addEventListener("submit", evento => {
-        if (!evento.defaultPrevented) { mostraAttesa(); }
+        if (!evento.defaultPrevented) {
+            const creazioneDocumento = evento.target.matches("[data-creazione-documento]");
+            testoAttesa.textContent = creazioneDocumento
+                ? "CREAZIONE DOCUMENTO IN CORSO..."
+                : "ATTENDERE...";
+            dettaglioAttesa.textContent = creazioneDocumento
+                ? "Modulo in elaborazione..."
+                : "";
+            mostraAttesa();
+        }
     });
     document.querySelectorAll("a[data-attesa]").forEach(collegamento => {
         collegamento.addEventListener("click", mostraAttesa);

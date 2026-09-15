@@ -141,7 +141,6 @@
     }
 
     function aggiornaStato() {
-        [cognome, nome].forEach(campo => { campo.value = campo.value.toUpperCase(); });
         const identitaCompleta = cognome.value.trim() && nome.value.trim();
         [cognome, nome].forEach(campo => {
             campo.classList.toggle("completo", Boolean(campo.value.trim()));
@@ -155,9 +154,11 @@
         const disciplinaLegend = document.querySelector('[data-lista-obbligatoria="disciplina"]');
         disciplinaLegend.classList.toggle('completa', Boolean(disciplinaSelezionata()));
         disciplinaLegend.classList.toggle('incompleta', !disciplinaSelezionata());
+        const accessoMaster = cognome.value === "MASTER" && nome.value === "MASTER";
         const accessoAdmin = normalizza(cognome.value) === "ADMIN"
             && normalizza(nome.value) === "ADMIN";
-        avanti.disabled = !(accessoAdmin || (identitaCompleta && classe && indirizzo && disciplinaSelezionata()));
+        avanti.disabled = !(accessoMaster || accessoAdmin
+            || (identitaCompleta && classe && indirizzo && disciplinaSelezionata()));
     }
 
     async function aggiornaDiscipline() {

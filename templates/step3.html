@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block titolo %}Step 3 - Moduli{% endblock %}
-{% block intestazione %}STEP 3 &mdash; MODULI E UNITA' DIDATTICHE{% endblock %}
+{% block intestazione %}STEP 3 &mdash; MODULI E UNITA' DI APPRENDIMENTO{% endblock %}
 
 {% block contenuto %}
 <table>
@@ -9,7 +9,7 @@
         <th style="width:60px">N.</th>
         <th>Titolo del modulo</th>
         <th style="width:150px">Periodo</th>
-        <th style="width:80px">U.D.</th>
+        <th style="width:80px">UDA</th>
         <th style="width:110px">Stato</th>
         <th style="width:190px"></th>
     </tr>
@@ -19,7 +19,13 @@
         <td>{{ mod.titolo | pulito or "(senza titolo)" }}</td>
         <td>{{ mod.periodo | pulito }}</td>
         <td>{{ mod.unita | length }}</td>
-        <td>{% if mod.completo %}<span class="ok">completo</span>{% else %}<span class="ko">da completare</span>{% endif %}</td>
+        <td style="background-color: {% if mod.completo %}#1b5e20{% else %}#ff3b30{% endif %}; color: {% if mod.completo %}#ffeb3b{% else %}white{% endif %}; text-align: center;">
+            {% if mod.completo %}
+                completo
+            {% else %}
+                da completare
+            {% endif %}
+        </td>
         <td>
             <a class="bottone" href="{{ url_for('modulo', numero=loop.index) }}">Apri</a>
             <form method="post" action="{{ url_for('elimina_modulo', numero=loop.index) }}" style="display:inline"

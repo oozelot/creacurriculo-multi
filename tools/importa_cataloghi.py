@@ -21,7 +21,7 @@ from curricolo.config import (  # noqa: E402
     INDIRIZZI,
     SIGLE_INDIRIZZO,
 )
-from curricolo.db import connessione, crea_schema  # noqa: E402
+from curricolo.db import connessione, crea_schema, sigla_ini_da_sigla  # noqa: E402
 from curricolo.testo import ripara_mojibake  # noqa: E402
 
 # Prefisso del file discipline_*.ini -> indirizzo. Le articolazioni esistono solo dal triennio.
@@ -35,43 +35,27 @@ FAMIGLIE = {
     "eno": "AGRARIO (eno)",
 }
 
-# Sigle a 5 caratteri usate nel nome del file da inviare (da da_form4.bas).
+# Sigle tecniche a 3 caratteri usate nei codici PECUP e nei dati applicativi.
 SIGLE_DISCIPLINA = {
-    "ALTERNATIVA IRC": "ALTER",
-    "BIOTECNOLOGIE AGRARIE": "BIOTA",
-    "BIOTECNOLOGIE VITIVINICOLE": "BIOTV",
-    "CHIMICA": "CHIMI",
-    "COMPLEMENTI DI MATEMATICA": "COMPM",
-    "DIRITTO ED ECONOMIA": "DIRIT",
-    "ECONOMIA, ESTIMO, MARKETING E LEGISLAZIONE": "ESTIM",
-    "ENOLOGIA": "ENOLO",
-    "FISICA": "FISIC",
-    "GENIO RURALE": "GENRU",
-    "GEOGRAFIA": "GEOGR",
-    "GEOPEDOLOGIA ECONOMIA ED ESTIMO": "GEOPE",
-    "GESTIONE DEL CANTIERE E SICUREZZA DELL'AMBIENTE DI LAVORO": "GESIC",
-    "GESTIONE DELL'AMBIENTE E DEL TERRITORIO": "GATER",
-    "INGLESE": "INGLE",
-    "IRC (RELIGIONE CATTOLICA)": "RELIG",
-    "ITALIANO": "ITALI",
-    "LABORATORI TECNICI": "LABTC",
-    "MATEMATICA": "MATEM",
-    "ORGANIZZAZIONE E GESTIONE DEI PROCESSI PRODUTTIVI": "ORGPP",
-    "PRODUZIONI ANIMALI": "PRANI",
-    "PRODUZIONI VEGETALI": "PRVEG",
-    "PROGETTAZIONE COSTRUZIONI E IMPIANTI": "PCIMP",
-    "PROGETTAZIONE MULTIMEDIALE": "PRMUL",
-    "S.T.A. (SCIENZE E TECNOLOGIE APPLICATE)": "STAPP",
-    "SCIENZA DELLA TERRA E BIOLOGIA": "SCBIO",
-    "SCIENZE MOTORIE": "SCMOT",
-    "STORIA": "STORI",
-    "T.T.R.G. (TECNOLOGIE E TECNICHE DI RAPPRESENTAZIONE GRAFICA)": "TTRGR",
-    "TECNOLOGIE DEI PROCESSI DI PRODUZIONE": "TPRPR",
-    "TECNOLOGIE INFORMATICHE": "INFOR",
-    "TEORIA DELLA COMUNICAZIONE": "TCOMU",
-    "TOPOGRAFIA": "TOPOG",
-    "TRASFORMAZIONE DEI PRODOTTI": "TRPRO",
-    "VITICOLTURA E DIFESA DELLA VITE": "VITIC",
+    "ALTERNATIVA IRC": "ALT", "BIOTECNOLOGIE AGRARIE": "BTC",
+    "BIOTECNOLOGIE VITIVINICOLE": "BTV", "CHIMICA": "CHI",
+    "COMPLEMENTI DI MATEMATICA": "CMT", "DIRITTO ED ECONOMIA": "DIR",
+    "ECONOMIA, ESTIMO, MARKETING E LEGISLAZIONE": "EST", "ENOLOGIA": "ENO",
+    "FISICA": "FIS", "GENIO RURALE": "GNR", "GEOGRAFIA": "GEO",
+    "GEOPEDOLOGIA ECONOMIA ED ESTIMO": "GEE",
+    "GESTIONE DEL CANTIERE E SICUREZZA DELL'AMBIENTE E DEL TERRITORIO": "GCS",
+    "GESTIONE DEL CANTIERE E SICUREZZA DELL'AMBIENTE DI LAVORO": "GCS",
+    "GESTIONE DELL'AMBIENTE E DEL TERRITORIO": "GAT", "INGLESE": "ING",
+    "IRC (RELIGIONE CATTOLICA)": "REL", "ITALIANO": "ITA", "LABORATORI TECNICI": "LTC",
+    "MATEMATICA": "MAT", "ORGANIZZAZIONE E GESTIONE DEI PROCESSI PRODUTTIVI": "OGP",
+    "PRODUZIONI ANIMALI": "PAN", "PRODUZIONI VEGETALI": "PVG",
+    "PROGETTAZIONE COSTRUZIONI E IMPIANTI": "PCI", "PROGETTAZIONE MULTIMEDIALE": "PRM",
+    "S.T.A. (SCIENZE E TECNOLOGIE APPLICATE)": "STA", "SCIENZA DELLA TERRA E BIOLOGIA": "SCI",
+    "SCIENZE MOTORIE": "SCM", "STORIA": "STO",
+    "T.T.R.G. (TECNOLOGIE E TECNICHE DI RAPPRESENTAZIONE GRAFICA)": "TRG",
+    "TECNOLOGIE DEI PROCESSI DI PRODUZIONE": "TPP", "TECNOLOGIE INFORMATICHE": "INF",
+    "TEORIA DELLA COMUNICAZIONE": "TCM", "TOPOGRAFIA": "TPG", "TRASFORMAZIONE DEI PRODOTTI": "TRP",
+    "VITICOLTURA E DIFESA DELLA VITE": "VIT",
 }
 
 SUFFISSI_VARIANTE = (
@@ -111,7 +95,7 @@ TESTI_DOCUMENTO = {
     "strumento": [
         "TEST D'INGRESSO",
         "PROVE INTERDISCIPLINARI",
-        "VERIFICHE ALLA FINE DELLE UNITA' DIDATTICHE",
+        "VERIFICHE ALLA FINE DELLE UNITA' DI APPRENDIMENTO",
         "PROVE DISCIPLINARI",
         "PROVE DI COMPETENZA",
         "PRODOTTI INDIVIDUALI DEGLI STUDENTI",
@@ -242,8 +226,8 @@ def importa_discipline(conn) -> None:
         for nome in righe_utili(percorso):
             if nome not in ids:
                 cur = conn.execute(
-                    "INSERT INTO discipline (nome, sigla) VALUES (?, ?)",
-                    (nome, sigla_disciplina(nome)),
+                    "INSERT INTO discipline (nome, sigla, sigla_ini) VALUES (?, ?, ?)",
+                    (nome, sigla_disciplina(nome), sigla_ini_da_sigla(sigla_disciplina(nome), nome)),
                 )
                 ids[nome] = int(cur.lastrowid)
             coppie.add((ids[nome], id_indirizzo[indirizzo], classe))

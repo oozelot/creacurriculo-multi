@@ -183,9 +183,16 @@
             gap: 6px;
             margin: 0;
             font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .scelte input, .scelta-inline input { width: auto; }
+        .scelta-inline.ed-civica-attiva {
+            background: #fff2a8;
+            box-shadow: inset 0 0 0 1px #d7b91b;
+        }
 
         button, .bottone {
             padding: 7px 16px;
@@ -251,9 +258,9 @@
             {% endif %}
             {% if accesso_step3 %}
             <a href="{{ url_for('step3') }}"
-                class="{{ 'attivo' if request.endpoint in ['step3', 'modulo', 'unita'] }} {{ 'passo-completo' if accesso_step4 else 'passo-incompleto' }} {{ 'uscita-non-salvare' if request.endpoint == 'step2' }}">3. Moduli e U.D.</a>
+                class="{{ 'attivo' if request.endpoint in ['step3', 'modulo', 'unita'] }} {{ 'passo-completo' if accesso_step4 else 'passo-incompleto' }} {{ 'uscita-non-salvare' if request.endpoint == 'step2' }}">3. Moduli e UDA</a>
             {% else %}
-            <span class="disabilitato passo-incompleto">3. Moduli e U.D.</span>
+            <span class="disabilitato passo-incompleto">3. Moduli e UDA</span>
             {% endif %}
             {% if accesso_step4 %}
             <a href="{{ url_for('step4') }}" class="{{ 'attivo' if request.endpoint == 'step4' }} passo-completo {{ 'uscita-non-salvare' if request.endpoint == 'step2' }}">4. Invio</a>
@@ -286,7 +293,7 @@
             {% elif request.endpoint == 'unita' %}
             <div class="comandi-fase">
                 <a class="bottone comando-fase" href="{{ url_for('modulo', numero=numero) }}">&lsaquo; Torna al modulo</a>
-                <button type="submit" form="form-unita" class="comando-fase principale" id="salva-unita" disabled>Salva unità didattica</button>
+                <button type="submit" form="form-unita" class="comando-fase principale" id="salva-unita" disabled>Salva unità di apprendimento</button>
             </div>
             {% endif %}
             {% if ritorno_admin and request.endpoint != 'step1' %}

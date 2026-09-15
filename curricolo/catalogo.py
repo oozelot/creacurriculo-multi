@@ -2,11 +2,32 @@
 
 from __future__ import annotations
 
+import re
+
+from . import db
 from .db import connessione
 
 
+def nome_disciplina_visualizzato(nome: str) -> str:
+    """Rimuove dai nomi mostrati le note descrittive dell'offerta formativa."""
+    return re.sub(r"\s*\(solo se specifica per (?:indirizzo|articolazione)\)$", "", nome, flags=re.IGNORECASE).strip()
+
+
+def discipline_normalizzate(classe: str, indirizzi: list[str]) -> list[str]:
+    """Unisce le discipline di piu' indirizzi senza duplicare le varianti testuali."""
+    nomi = []
+    for indirizzo in indirizzi:
+        nomi.extend(discipline(classe, indirizzo))
+    return sorted({nome_disciplina_visualizzato(nome) for nome in nomi})
+
+
+def disciplina_presente(classe: str, indirizzo: str, nome: str) -> bool:
+    nome = nome_disciplina_visualizzato(nome).casefold()
+    return any(nome_disciplina_visualizzato(voce).casefold() == nome for voce in discipline(classe, indirizzo))
+
+
 # Materie storiche valide senza una terna completa nel catalogo PECUP legacy.
-SIGLE_PECUP_OPZIONALI = {"ESTIM", "RELIG"}
+SIGLE_PECUP_OPZIONALI = {"EST", "REL"}
 TIPI_PECUP = ("abilita", "conoscenza", "competenza")
 PREFISSI_PECUP = {"abilita": "AB", "conoscenza": "CS", "competenza": "CT"}
 MATERIE_STORICHE_IN_EVIDENZA = {"ALTERNATIVA IRC", "BIOTECNOLOGIE AGRARIE"}
@@ -32,7 +53,7 @@ def discipline(classe: str, indirizzo: str) -> list[str]:
     with connessione() as conn:
         righe = conn.execute(
             """
-            SELECT d.nome
+            SELECT DISTINCT d.nome
               FROM discipline d
               JOIN offerta_formativa o ON o.disciplina_id = d.id
               JOIN indirizzi i ON i.id = o.indirizzo_id
@@ -51,6 +72,14 @@ def sigla_disciplina(nome: str) -> str:
             "SELECT sigla FROM discipline WHERE upper(trim(nome)) = upper(trim(?))", (nome,)
         ).fetchone()
         return riga["sigla"] if riga else nome[:5].upper()
+
+
+def sigla_ini_disciplina(nome: str) -> str:
+    with connessione() as conn:
+        riga = conn.execute(
+            "SELECT sigla_ini FROM discipline WHERE upper(trim(nome)) = upper(trim(?))", (nome,)
+        ).fetchone()
+    return str(riga["sigla_ini"] or db.sigla_ini_da_nome(nome)) if riga else db.sigla_ini_da_nome(nome)
 
 
 def offerta() -> list[dict[str, str]]:
@@ -83,7 +112,7 @@ def materie() -> list[dict[str, object]]:
             """
         )
         discipline_importate = {
-            riga["disciplina"].upper()
+            sigla_disciplina(riga["disciplina"]).upper()
             for riga in conn.execute("SELECT DISTINCT disciplina FROM ricevuti")
         }
         raggruppate: dict[str, dict[str, object]] = {}
@@ -114,16 +143,41 @@ def materie() -> list[dict[str, object]]:
             for tipo in ("abilita", "conoscenza", "competenza")
         ))
         voce["avviso"] = (
-            "giallo" if str(voce["nome"]).upper() in MATERIE_STORICHE_IN_EVIDENZA
-            else "arancione" if not voce["completa"]
+            "arancione" if not voce["completa"]
             else "giallo" if (
-                bool(voce["attende_ini"])
-                and str(voce["nome"]).upper() not in discipline_importate
+                str(voce["sigla"]).upper() not in discipline_importate
             )
             else ""
         )
         risultato.append(voce)
     return risultato
+
+
+def valida_sigla_tecnica(sigla: str) -> bool:
+    return bool(re.fullmatch(r"[A-Z0-9]{3}", str(sigla or "").strip().upper()))
+
+
+def sigla_tecnica_in_uso(sigla: str, identificativo: int | None = None) -> bool:
+    sigla = str(sigla or "").strip().upper()
+    if not valida_sigla_tecnica(sigla):
+        return False
+    with connessione() as conn:
+        riga = conn.execute(
+            "SELECT id FROM discipline WHERE upper(sigla) = upper(?) AND (? IS NULL OR id != ?)",
+            (sigla, identificativo, identificativo),
+        ).fetchone()
+        return riga is not None
+
+
+def aggiorna_sigla_materia(identificativo: int, sigla: str) -> bool:
+    """Aggiorna la sigla tecnica di una materia, se la nuova sigla e' valida."""
+    sigla = str(sigla or "").strip().upper()
+    if not valida_sigla_tecnica(sigla):
+        return False
+    with connessione() as conn:
+        conn.execute("UPDATE discipline SET sigla = ? WHERE id = ?", (sigla, identificativo))
+        conn.commit()
+    return True
 
 
 def materia(identificativo: int) -> dict[str, object] | None:
@@ -298,7 +352,8 @@ def aggiungi_materia(nome: str, sigla: str, percorsi: list[tuple[str, str]]) -> 
         if esistente:
             raise ValueError("Esiste gia' una materia con lo stesso nome o la stessa sigla.")
         materia_id = conn.execute(
-            "INSERT INTO discipline (nome, sigla, attende_ini) VALUES (?, ?, 1)", (nome, sigla)
+            "INSERT INTO discipline (nome, sigla, sigla_ini, attende_ini) VALUES (?, ?, ?, 1)",
+            (nome, sigla, db.sigla_ini_da_nome(nome)),
         ).lastrowid
         for classe, indirizzo in percorsi:
             riga_classe = conn.execute("SELECT numero FROM classi WHERE nome = ?", (classe,)).fetchone()
@@ -376,24 +431,117 @@ def competenze_ue() -> list[dict[str, object]]:
             )
         return schede
 
+def codici_pecup(
+    tipo: str,
+    disciplina: str | None = None,
+    classe: str | None = None,
+    indirizzo: str | None = None,
+) -> list[dict[str, str]]:
+    """Codici validi per disciplina/classe/indirizzo oppure globali se i parametri sono None."""
+    with connessione() as conn:
+        if disciplina is None and classe is None and indirizzo is None:
+            righe = conn.execute(
+                """
+                SELECT codice, descrizione
+                  FROM pecup
+                 WHERE tipo = ?
+                 ORDER BY codice
+                """,
+                (tipo,),
+            ).fetchall()
+        else:
+            righe = conn.execute(
+                """
+                SELECT DISTINCT p.codice, p.descrizione
+                  FROM pecup p
+                  JOIN pecup_validita v ON v.pecup_id = p.id
+                  JOIN indirizzi i ON i.id = v.indirizzo_id
+                  JOIN classi c ON c.numero = v.classe
+                 WHERE p.tipo = ?
+                   AND (upper(?) = upper(v.disciplina)
+                        OR upper(?) LIKE upper(v.disciplina) || ' %')
+                   AND c.nome = ?
+                   AND i.nome IN (?, 'COMUNE')
+                 ORDER BY p.codice
+                """,
+                (tipo, disciplina, disciplina, classe, indirizzo),
+            ).fetchall()
 
-def codici_pecup(tipo: str, disciplina: str, classe: str, indirizzo: str) -> list[dict[str, str]]:
-    """Codici validi per disciplina/classe/indirizzo, come faceva il lookup di Form3."""
+        return [
+            {"codice": r["codice"], "descrizione": r["descrizione"]}
+            for r in righe
+        ]
+
+
+def codici_pecup_materie(tipo: str) -> list[dict[str, object]]:
+    """Codici globali con disciplina, classe e articolazione dal database."""
     with connessione() as conn:
         righe = conn.execute(
             """
-            SELECT DISTINCT p.codice, p.descrizione
+            SELECT p.codice, p.descrizione, v.disciplina, v.classe,
+                   i.posizione AS posizione_indirizzo
               FROM pecup p
               JOIN pecup_validita v ON v.pecup_id = p.id
               JOIN indirizzi i ON i.id = v.indirizzo_id
-              JOIN classi c ON c.numero = v.classe
-                         WHERE p.tipo = ?
-                             AND (upper(?) = upper(v.disciplina)
-                                        OR upper(?) LIKE upper(v.disciplina) || ' %')
-               AND c.nome = ?
-                             AND i.nome IN (?, 'COMUNE')
-             ORDER BY p.codice
+             WHERE p.tipo = ?
+             ORDER BY p.codice, v.disciplina, v.classe, i.posizione
             """,
-            (tipo, disciplina, disciplina, classe, indirizzo),
+            (tipo,),
+        ).fetchall()
+
+    voci: dict[str, dict[str, object]] = {}
+    for riga in righe:
+        voce = voci.setdefault(
+            riga["codice"],
+            {
+                "codice": riga["codice"],
+                "descrizione": riga["descrizione"],
+                "materie": [],
+                "classi": [],
+                "indirizzi": [],
+            },
         )
-        return [{"codice": r["codice"], "descrizione": r["descrizione"]} for r in righe]
+        materie = voce["materie"]
+        if riga["disciplina"] not in materie:  # type: ignore[operator]
+            materie.append(riga["disciplina"])  # type: ignore[union-attr]
+        classi = voce["classi"]
+        if riga["classe"] not in classi:  # type: ignore[operator]
+            classi.append(riga["classe"])  # type: ignore[union-attr]
+        indirizzi = voce["indirizzi"]
+        posizione = str(riga["posizione_indirizzo"])
+        if posizione not in indirizzi:  # type: ignore[operator]
+            indirizzi.append(posizione)  # type: ignore[union-attr]
+
+    for voce in voci.values():
+        codice = str(voce["codice"])
+        voce["articolazione"] = codice[3] if len(codice) == 12 else ""
+    return list(voci.values())
+
+
+def codici_sicurezza_biennio(tipo: str) -> list[dict[str, object]]:
+        """Voci di sicurezza del biennio per le quattro discipline propedeutiche."""
+        discipline = {"DIRITTO ED ECONOMIA", "CHIMICA", "FISICA", "INFORMATICA"}
+        with connessione() as conn:
+                righe = conn.execute(
+                        """
+                        SELECT DISTINCT p.codice, p.descrizione
+                            FROM pecup p
+                            JOIN pecup_validita v ON v.pecup_id = p.id
+                         WHERE p.tipo = ?
+                             AND v.classe IN (1, 2)
+                             AND upper(v.disciplina) IN (?, ?, ?, ?)
+                             AND upper(p.descrizione) LIKE '%SICUREZZA%'
+                         ORDER BY p.codice
+                        """,
+                        (tipo, *sorted(discipline)),
+                ).fetchall()
+        return [
+            {
+                "codice": r["codice"],
+                "descrizione": r["descrizione"],
+                "materie": ["Sicurezza biennio"],
+                "classi": [1, 2],
+                "articolazione": str(r["codice"])[3] if len(str(r["codice"])) == 12 else "",
+            }
+            for r in righe
+        ]

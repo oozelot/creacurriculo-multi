@@ -33,14 +33,18 @@ INTESTAZIONE = (
 )
 
 
-def nome_file_invio(prog: Programmazione, giorno: date | None = None) -> str:
+def nome_file_invio(
+    prog: Programmazione, giorno: date | None = None, referente: str = ""
+) -> str:
     giorno = giorno or date.today()
-    sigla = catalogo.sigla_disciplina(prog.disciplina)
+    sigla = catalogo.sigla_ini_disciplina(prog.disciplina)
     indirizzo = catalogo.sigla_indirizzo(prog.indirizzo)
     cognome = f"{prog.cognome.strip().upper():<3}"[:3]
     nome = f"{prog.nome.strip().upper():<3}"[:3]
     classe = prog.classe.strip().upper()[:5]
-    return f"{sigla}_{indirizzo}_{cognome}{nome}_{classe}_{giorno:%d_%m_%y}.ini"
+    referente = " ".join(parola.casefold().capitalize() for parola in referente.split())
+    suffisso = f" - {referente}" if referente else ""
+    return f"{sigla}_{indirizzo}_{cognome}{nome}_{classe}_{giorno:%d_%m_%y}{suffisso}.ini"
 
 
 def _riga(codice: str, etichetta: str, valore: str) -> str:
@@ -63,7 +67,7 @@ def _voci_selezionate(scelte: list[int], elenco: list[str]) -> list[str]:
 
 def _righe_unita(ud: UnitaDidattica, modulo: int, unita: int) -> list[str]:
     # Bug del generatore VB6 riprodotto per compatibilita': per i moduli 1-9 il numero
-    # della UD viene scritto su 3 cifre quando vale 10, per il modulo 10 su una sola cifra.
+    # della UDA viene scritto su 3 cifre quando vale 10, per il modulo 10 su una sola cifra.
     bn = f"{modulo:02d}"
     bu = f"0{unita}" if modulo < 10 else str(unita)
     coda = f"N\u00b0{unita}DEL MODULO N\u00b0{modulo}"
@@ -75,16 +79,16 @@ def _righe_unita(ud: UnitaDidattica, modulo: int, unita: int) -> list[str]:
     multi = [MULTIDISCIPLINARE[i - 1] if i in scelte else "" for i in range(1, 5)]
 
     righe = [
-        riga(1, f"TITOLO UNITA DIDATTICA {coda}", ud.titolo),
-        riga(2, f"argomenti unita didattica {coda}", multiline(ud.argomenti)),
-        riga(3, f"prerequisiti unita didattica {coda}", multiline(ud.prerequisiti)),
-        riga(4, f"si no inserita in un quadro multidisciplinare unita didattica {coda}", multi[0]),
-        riga(5, f"quadro multidisciplinare educazione civica unita didattica {coda}", multi[1]),
-        riga(6, f"quadro multidisciplinare sicurezza prime unita didattica {coda}", multi[2]),
-        riga(7, f"altro quadro multidisciplinare unita didattica {coda}", multi[3]),
+        riga(1, f"TITOLO UNITA DI APPRENDIMENTO {coda}", ud.titolo),
+        riga(2, f"argomenti unita di apprendimento {coda}", multiline(ud.argomenti)),
+        riga(3, f"prerequisiti unita di apprendimento {coda}", multiline(ud.prerequisiti)),
+        riga(4, f"si no inserita in un quadro multidisciplinare unita di apprendimento {coda}", multi[0]),
+        riga(5, f"quadro multidisciplinare educazione civica unita di apprendimento {coda}", multi[1]),
+        riga(6, f"quadro multidisciplinare sicurezza prime unita di apprendimento {coda}", multi[2]),
+        riga(7, f"altro quadro multidisciplinare unita di apprendimento {coda}", multi[3]),
         riga(
             8,
-            f"quale altro quadro multidisciplinare unita didattica {coda}",
+            f"quale altro quadro multidisciplinare unita di apprendimento {coda}",
             ud.multidisciplinare_altro,
         ),
     ]
@@ -92,34 +96,47 @@ def _righe_unita(ud: UnitaDidattica, modulo: int, unita: int) -> list[str]:
     campo = 8
     for k in range(1, MAX_ABILITA + 1):
         campo += 1
-        righe.append(riga(campo, f"abilit\u00e0 n\u00b0{k}  dell'unita didattica {coda}", multiline(ud.abilita[k - 1])))
+        righe.append(riga(campo, f"abilit\u00e0 n\u00b0{k}  dell'unita di apprendimento {coda}", multiline(ud.abilita[k - 1])))
     for k in range(1, MAX_ABILITA + 1):
         campo += 1
-        righe.append(riga(campo, f"codice abilit\u00e0 n\u00b0{k}  dell'unita didattica {coda}", ud.codici_abilita[k - 1]))
+        righe.append(riga(campo, f"codice abilit\u00e0 n\u00b0{k}  dell'unita di apprendimento {coda}", ud.codici_abilita[k - 1]))
     for k in range(1, MAX_CONOSCENZE + 1):
         campo += 1
-        righe.append(riga(campo, f"conoscenza n\u00b0{k}  dell'unita didattica {coda}", multiline(ud.conoscenze[k - 1])))
+        righe.append(riga(campo, f"conoscenza n\u00b0{k}  dell'unita di apprendimento {coda}", multiline(ud.conoscenze[k - 1])))
     for k in range(1, MAX_CONOSCENZE + 1):
         campo += 1
-        righe.append(riga(campo, f"codice conoscenza n\u00b0{k}  dell'unita didattica {coda}", ud.codici_conoscenze[k - 1]))
+        righe.append(riga(campo, f"codice conoscenza n\u00b0{k}  dell'unita di apprendimento {coda}", ud.codici_conoscenze[k - 1]))
     for k in range(1, 9):
         campo += 1
         valore = COMPETENZE_EUROPEE[k - 1] if k in ud.competenze_europee else ""
-        righe.append(riga(campo, f"competenza in chiave europea n\u00b0{k}  dell'unita didattica {coda}", valore))
+        righe.append(riga(campo, f"competenza in chiave europea n\u00b0{k}  dell'unita di apprendimento {coda}", valore))
     for k in range(1, 9):
         campo += 1
         valore = COMPETENZE_CITTADINANZA[k - 1] if k in ud.competenze_cittadinanza else ""
-        righe.append(riga(campo, f"competenza in chiave cittadinanza n\u00b0{k}  dell'unita didattica {coda}", valore))
+        righe.append(riga(campo, f"competenza in chiave cittadinanza n\u00b0{k}  dell'unita di apprendimento {coda}", valore))
     for k in range(1, MAX_COMPETENZE_PECUP + 1):
         campo += 1
-        righe.append(riga(campo, f"competenza pecup n\u00b0{k}  dell'unita didattica {coda}", multiline(ud.competenze_pecup[k - 1])))
+        righe.append(riga(campo, f"competenza pecup n\u00b0{k}  dell'unita di apprendimento {coda}", multiline(ud.competenze_pecup[k - 1])))
     for k in range(1, MAX_COMPETENZE_PECUP + 1):
         campo += 1
-        righe.append(riga(campo, f"codice competenza pecup n\u00b0{k}  dell'unita didattica {coda}", ud.codici_competenze_pecup[k - 1]))
+        righe.append(riga(campo, f"codice competenza pecup n\u00b0{k}  dell'unita di apprendimento {coda}", ud.codici_competenze_pecup[k - 1]))
 
-    righe.append(_riga(f"{bn}{bu}71", f"competenze minime unita didattica {coda}", multiline(ud.competenze_minime)))
-    righe.append(_riga(f"{bn}{bu}72", f"competenze intermedie unita didattica {coda}", multiline(ud.competenze_intermedie)))
-    righe.append(_riga(f"{bn}{bu}73", f"competenze avanzate unita didattica {coda}", multiline(ud.competenze_avanzate)))
+    righe.append(_riga(f"{bn}{bu}71", f"competenze minime unita di apprendimento {coda}", multiline(ud.competenze_minime)))
+    righe.append(_riga(f"{bn}{bu}72", f"competenze intermedie unita di apprendimento {coda}", multiline(ud.competenze_intermedie)))
+    righe.append(_riga(f"{bn}{bu}73", f"competenze avanzate unita di apprendimento {coda}", multiline(ud.competenze_avanzate)))
+    righe.append(_riga(
+        f"{bn}{bu}74",
+        f"quadro multidisciplinare scienze sperimentali unita di apprendimento {coda}",
+        MULTIDISCIPLINARE[4] if 5 in ud.multidisciplinare else "",
+    ))
+    righe.append(_riga(
+        f"{bn}{bu}75",
+        f"voci educazione civica unita di apprendimento {coda}",
+        "@".join(str(voce).strip() for voce in ud.ec_voci if str(voce).strip()),
+    ))
+    righe.append(_riga(f"{bn}{bu}76", f"ore educazione civica unita di apprendimento {coda}", ud.ec_ore))
+    righe.append(_riga(f"{bn}{bu}77", f"periodo educazione civica unita di apprendimento {coda}", ud.ec_periodo))
+    righe.append(_riga(f"{bn}{bu}78", f"quadrimestre educazione civica unita di apprendimento {coda}", ud.ec_quadrimestre))
     return righe
 
 
@@ -135,19 +152,19 @@ def _righe_modulo(modulo: Modulo, numero: int) -> list[str]:
         _riga(f"{bn}0005", f"opzione palestra del modulo{numero}", spazi[2]),
         _riga(f"{bn}0006", f"opzione altri spazi del modulo{numero}", spazi[3]),
         _riga(f"{bn}0007", f"specificazione di spazi del modulo{numero}", modulo.spazi_altro),
-        _riga(f"{bn}0008", f"N\u00b0 UD UTILIZZATE PER IL MODULO{numero}", str(len(modulo.unita))),
+        _riga(f"{bn}0008", f"N\u00b0 UDA UTILIZZATE PER IL MODULO{numero}", str(len(modulo.unita))),
         _riga(
             f"{bn}0009",
-            f"Unita didattica in uso per il modulo{numero}",
+            f"Unita di apprendimento in uso per il modulo{numero}",
             modulo.unita_in_uso or str(len(modulo.unita) or 1),
         ),
-        _sezione(f"======== UNITA' DIDATTICHE DEL MODULO N\u00b0{numero}========"),
+        _sezione(f"======== UNITA' DI APPRENDIMENTO DEL MODULO N\u00b0{numero}========"),
     ]
     if not modulo.unita:
-        righe.append(_sezione(f"IL MODULO N\u00b0{numero}NON CONTIENE UNITA' DIDATTICHE"))
+        righe.append(_sezione(f"IL MODULO N\u00b0{numero}NON CONTIENE UNITA' DI APPRENDIMENTO"))
         return righe
     for indice, ud in enumerate(modulo.unita, start=1):
-        righe.append(_sezione(f"***UNITA' DIDATTICA N\u00b0{indice}DEL MODULO N\u00b0{numero} ***"))
+        righe.append(_sezione(f"***UNITA' DI APPRENDIMENTO N\u00b0{indice}DEL MODULO N\u00b0{numero} ***"))
         righe.extend(_righe_unita(ud, numero, indice))
     return righe
 
@@ -200,7 +217,8 @@ def scrivi_file(prog: Programmazione, giorno: date | None = None) -> Path:
     giorno = giorno or date.today()
     cartella = CARTELLA_LAVORI / prog.cartella_docente / "da_inviare"
     cartella.mkdir(parents=True, exist_ok=True)
-    percorso = cartella / nome_file_invio(prog, giorno)
+    referente = f"{prog.nome.strip()} {prog.cognome.strip()}".strip()
+    percorso = cartella / nome_file_invio(prog, giorno, referente)
     contenuto = "\r\n".join(genera_righe(prog, giorno)) + "\r\n"
     percorso.write_bytes(contenuto.encode(ENCODING_INI, errors="replace"))
     return percorso

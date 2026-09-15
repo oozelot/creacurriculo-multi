@@ -5,6 +5,7 @@ from __future__ import annotations
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
 from .testo import ripara_mojibake
@@ -25,8 +26,9 @@ def crea_documento():
             continue
         corpo.remove(elemento)
     stile = doc.styles["Normal"]
-    stile.font.name = "Times New Roman"
-    stile.font.size = Pt(12)
+    stile.font.name = "Arial"
+    stile._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
+    stile.font.size = Pt(10)
     return doc
 
 
@@ -111,18 +113,29 @@ def _imposta_griglia(destinazione, larghezze: list) -> None:
             cella.width = larghezza
 
 
-def riga_tabella(destinazione, valori: list[str], *, grassetto=False, corpo=9) -> None:
+def riga_tabella(
+    destinazione,
+    valori: list[str],
+    *,
+    grassetto=False,
+    corpo=9,
+    corpi: tuple[int, ...] | None = None,
+) -> None:
     celle = destinazione.add_row().cells
-    larghezze = _larghezze_colonne(valori, destinazione._colonne_strette)
+    larghezze = getattr(destinazione, "_larghezze_personalizzate", None) or _larghezze_colonne(valori, destinazione._colonne_strette)
     _imposta_griglia(destinazione, larghezze)
-    for cella, valore, larghezza in zip(celle, valori, larghezze):
+    for indice_cella, (cella, valore, larghezza) in enumerate(zip(celle, valori, larghezze)):
         cella.width = larghezza
         cella.text = ""
         par = cella.paragraphs[0]
+        if indice_cella in (1, 3):
+            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
         for indice, riga in enumerate(ripara_mojibake(valore or "").split("\n")):
             tratto = (par if indice == 0 else cella.add_paragraph()).add_run(riga)
             tratto.bold = grassetto
-            tratto.font.size = Pt(corpo)
+            tratto.font.size = Pt(corpi[indice_cella] if corpi else corpo)
+            tratto.font.name = "Arial"
+            tratto._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
 
 
 def riga_unita(destinazione, titolo: str) -> None:

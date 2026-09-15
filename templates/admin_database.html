@@ -19,8 +19,10 @@
                 <form method="post" id="azioni-file"><input type="hidden" name="nome" id="nome-file">
                     <button type="submit" formaction="{{ url_for('admin_file_stampe') }}">Stampe Word</button>
                     <button type="submit" formaction="{{ url_for('admin_importa') }}" id="aggiungi-database">Aggiungi al data base</button>
-                    <button type="submit" formaction="{{ url_for('admin_importa_tutti') }}" id="aggiungi-tutti">Aggiungi tutti i file al database</button>
+                    <button type="submit" formaction="{{ url_for('admin_importa_tutti') }}" id="aggiungi-tutti">Aggiungi tutto al database</button>
                     <button type="submit" formaction="{{ url_for('admin_file_impostazioni') }}">Crea Cartella Dati utente</button>
+                    <button type="submit" formaction="{{ url_for('admin_file_elimina') }}" id="elimina-file">Elimina file ini selezionato</button>
+                    <button type="submit" formaction="{{ url_for('admin_file_impostazioni_tutti') }}" id="impostazioni-tutti">Crea cartelle dati di tutti</button>
                 </form>
             </div>
         </fieldset>
@@ -37,6 +39,7 @@
             <div class="selezione-database" id="record-selezionato"></div>
             <div class="barra">
                 <form method="post" id="azioni-record"><input type="hidden" name="identificativo" id="identificativo-record">
+                    <label>Referente (facoltativo): <input type="text" name="referente" placeholder="Nome Cognome"></label>
                     <button type="submit" formaction="{{ url_for('admin_azione_record', azione='esporta') }}">Trasforma in file .ini</button>
                     <button type="submit" formaction="{{ url_for('admin_azione_record', azione='elimina') }}" id="cancella-record">Cancella record</button>
                 </form>
@@ -65,7 +68,8 @@
         const fileScelto = Boolean(fileSelezionato());
         const recordScelto = Boolean(recordSelezionato());
         pulsantiFile.forEach(pulsante => {
-            pulsante.disabled = pulsante.id === "aggiungi-tutti" ? false : !fileScelto;
+            pulsante.disabled = ["aggiungi-tutti", "impostazioni-tutti"].includes(pulsante.id)
+                ? false : !fileScelto;
         });
         pulsantiRecord.forEach(pulsante => { pulsante.disabled = !recordScelto; });
     }
@@ -74,7 +78,10 @@
     aggiornaPulsanti();
     document.getElementById("azioni-file").addEventListener("submit", evento => {
         const scelta = fileSelezionato();
-        if (!scelta && evento.submitter.id !== "aggiungi-tutti") { evento.preventDefault(); return; }
+        if (!scelta && !["aggiungi-tutti", "impostazioni-tutti"].includes(evento.submitter.id)) {
+            evento.preventDefault();
+            return;
+        }
         if (evento.submitter.id === "aggiungi-database" && scelta.dataset.importato === "1"
             && !confirm("Il record e' gia' presente. Sostituire i dati esistenti?")) {
             evento.preventDefault();
@@ -91,6 +98,16 @@
                 + "\n\nSostituire questi dati?"
             ) ? "1" : "0";
             evento.target.appendChild(campoSostituisci);
+        }
+        if (evento.submitter.id === "impostazioni-tutti" && !confirm(
+            "Creare le cartelle dati di tutti gli utenti?\n\nPremi OK per procedere, Annulla per tornare indietro."
+        )) {
+            evento.preventDefault();
+        }
+        if (evento.submitter.id === "elimina-file" && !confirm(
+            "Sei sicuro di volere eliminare questo file?\n\nPremi OK per procedere, Annulla per tornare indietro."
+        )) {
+            evento.preventDefault();
         }
     });
     document.getElementById("azioni-record").addEventListener("submit", evento => {

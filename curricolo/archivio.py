@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import esporta_ini, importa_ini
+from . import educazione_civica, esporta_ini, importa_ini
 from .config import CARTELLA_RICEVUTI, CLASSI, INDIRIZZI
 from .db import connessione
 from .modello import Programmazione
@@ -59,7 +59,9 @@ def importa(percorso: Path) -> int:
         riga = conn.execute(
             "SELECT id FROM ricevuti WHERE nome_file = ?", (percorso.name,)
         ).fetchone()
-        return int(riga["id"])
+        identificativo = int(riga["id"])
+    educazione_civica.sincronizza_conferme_programmazione(prog)
+    return identificativo
 
 
 def leggi_file(percorso: Path) -> Programmazione:
@@ -112,28 +114,45 @@ def programmazione(identificativo: int) -> Programmazione | None:
 
 
 def elimina(identificativo: int) -> bool:
+    prog = programmazione(identificativo)
     with connessione() as conn:
         modificate = conn.execute(
             "DELETE FROM ricevuti WHERE id = ?", (identificativo,)
         ).rowcount
         conn.commit()
+    if modificate and prog is not None:
+        educazione_civica.rimuovi_conferme_programmazione(prog)
     return modificate > 0
 
 
-def esporta_su_file(identificativo: int) -> Path | None:
+def esporta_su_file(identificativo: int, referente: str = "") -> Path | None:
     """Riscrive un record dell'archivio come file INI in ADMIN/file_ricevuti."""
     prog = programmazione(identificativo)
     if prog is None:
         return None
     with connessione() as conn:
-        riga = conn.execute("SELECT data FROM ricevuti WHERE id = ?", (identificativo,)).fetchone()
+        riga = conn.execute(
+            "SELECT data, nome_file FROM ricevuti WHERE id = ?", (identificativo,)
+        ).fetchone()
     giorno = _data(riga["data"] if riga else "")
+    referente = (
+        referente.strip()
+        or f"{prog.nome} {prog.cognome}"
+    )
 
     CARTELLA_RICEVUTI.mkdir(parents=True, exist_ok=True)
-    percorso = CARTELLA_RICEVUTI / esporta_ini.nome_file_invio(prog, giorno)
+    percorso = CARTELLA_RICEVUTI / esporta_ini.nome_file_invio(prog, giorno, referente)
     contenuto = "\r\n".join(esporta_ini.genera_righe(prog, giorno)) + "\r\n"
     percorso.write_bytes(contenuto.encode("cp1252", errors="replace"))
     return percorso
+
+
+def _referente_da_nome_file(nome_file: str) -> str:
+    """Ricava e normalizza il referente dal suffisso del nome file originale."""
+    suffisso = Path(nome_file).stem.rpartition(" - ")
+    if not suffisso[0] or not suffisso[2].strip():
+        return ""
+    return " ".join(parola.casefold().capitalize() for parola in suffisso[2].split())
 
 
 def _data(testo: str) -> date:
@@ -154,7 +173,7 @@ def completamento() -> dict[tuple[str, str, str], int]:
 
 
 def unita_per_competenza(classe: str, indirizzi: list[str]) -> dict[int, list[dict[str, Any]]]:
-    """Unita' didattiche che concorrono a ciascuna competenza in chiave europea."""
+    """Unita' di apprendimento che concorrono a ciascuna competenza in chiave europea."""
     trovate: dict[int, list[dict[str, Any]]] = {}
     for record in elenca(classe=classe):
         if record["indirizzo"] not in indirizzi:
@@ -172,7 +191,7 @@ def unita_per_competenza(classe: str, indirizzi: list[str]) -> dict[int, list[di
 
 
 def aree_multidisciplinari(classe: str, indirizzi: list[str]) -> dict[str, list[dict[str, Any]]]:
-    """Unita' didattiche raggruppate per area multidisciplinare dichiarata."""
+    """Unita' di apprendimento raggruppate per area multidisciplinare dichiarata."""
     trovate: dict[str, list[dict[str, Any]]] = {}
     for record in elenca(classe=classe):
         if record["indirizzo"] not in indirizzi:
@@ -197,6 +216,8 @@ def _aree(unita) -> list[str]:
         aree.append("SICUREZZA")
     if 4 in unita.multidisciplinare and unita.multidisciplinare_altro.strip():
         aree.append(unita.multidisciplinare_altro.strip().upper())
+    if 5 in unita.multidisciplinare:
+        aree.append('SCIENZE SPERIMENTALI')
     return aree
 
 

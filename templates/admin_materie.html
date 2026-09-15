@@ -2,6 +2,15 @@
 
 {% block contenuto %}
 {% set modifica = materia_selezionata is not none %}
+{% set etichette_indirizzi = {
+    'COMUNE': 'COM',
+    'CAT': 'CAT',
+    'GRAFICO': 'GRA',
+    'AGRARIO (tutte le articolazioni)': 'AGR',
+    'AGRARIO (g.a.t.)': 'AGR (gat.)',
+    'AGRARIO (p.t.)': 'AGR (p.t.)',
+    'AGRARIO (eno)': 'AGR (eno)'
+} %}
 <fieldset class="gestione-materie">
     <legend>Gestione materie</legend>
     <div class="materie-layout">
@@ -9,7 +18,7 @@
             <legend>Materie configurate</legend>
             <div class="lista-materie">
                 {% for materia in materie %}
-                <label class="materia {{ materia.avviso }}">
+                <label class="materia {{ materia.avviso }} {{ 'completa' if materia.completa and not materia.avviso }}">
                     <input type="radio" name="materia" value="{{ materia.id }}"
                         {{ 'checked' if modifica and materia.id == materia_selezionata.id }}>
                     <span title="{{ materia.nome }}">{{ materia.nome }}</span>
@@ -34,14 +43,14 @@
                 <label for="nome">Nome della materia</label>
                 <input type="text" id="nome" name="nome" maxlength="120" value="{{ materia_selezionata.nome if modifica else '' }}" required>
                 <label for="sigla">Sigla tecnica</label>
-                <input type="text" id="sigla" name="sigla" maxlength="12" list="suggerimenti-sigla" value="{{ materia_selezionata.sigla if modifica else '' }}" required>
+                <input type="text" id="sigla" name="sigla" maxlength="3" list="suggerimenti-sigla" value="{{ materia_selezionata.sigla if modifica else '' }}" required>
                 <datalist id="suggerimenti-sigla"></datalist>
-                <p class="nota" id="guida-sigla">Scrivere da 3 a 12 lettere o numeri, senza spazi.</p>
+                <p class="nota" id="guida-sigla">Scrivere 3 lettere o numeri, senza spazi.</p>
 
                 <p class="etichetta-matrice">Classi e indirizzi in cui la materia viene insegnata</p>
                 <div class="matrice-percorsi">
                     <div></div>
-                    {% for indirizzo in indirizzi %}<strong title="{{ indirizzo }}">{{ indirizzo }}</strong>{% endfor %}
+                    {% for indirizzo in indirizzi %}<strong title="{{ indirizzo }}">{{ etichette_indirizzi.get(indirizzo, indirizzo) }}</strong>{% endfor %}
                     {% for classe in classi %}
                     <strong>{{ classe }}</strong>
                     {% for indirizzo in indirizzi %}
@@ -78,12 +87,14 @@
     .materia span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .materia.giallo { background-color: #fff59d !important; }
     .materia.arancione { background-color: #ffb74d !important; }
+    .materia.completa { background-color: #b9f6a5 !important; }
     .campione { display: inline-block; width: 12px; height: 12px; border: 1px solid #000; vertical-align: middle; }
     .campione.giallo { background: #fff59d; }
     .campione.arancione { background: #ffb74d; }
     .etichetta-matrice { margin: 12px 0 4px; font-weight: bold; text-transform: uppercase; }
+    #form-materia input[type="text"] { font-weight: bold; }
     .matrice-percorsi { display: grid; grid-template-columns: 80px repeat(7, 28px); gap: 1px; align-items: center; }
-    .matrice-percorsi strong { overflow: hidden; text-align: center; font-size: 9px; }
+    .matrice-percorsi strong { overflow: hidden; text-align: center; font-size: 8px; line-height: 1.1; white-space: normal; }
     .casella { height: 22px; margin: 0; border: 1px solid #000; background: #ff3b30; text-align: center; }
     .casella:has(input:checked) { background: #b9f6a5; }
     .casella input { margin: 4px 0 0; }
@@ -124,7 +135,7 @@
         suggerimenti();
         sigla.value = sigla.value.toUpperCase();
         const nomeValido = nome.value.trim().length >= 3;
-        const siglaValida = /^[A-Z0-9]{3,12}$/.test(sigla.value.trim());
+        const siglaValida = /^[A-Z0-9]{3}$/.test(sigla.value.trim());
         nome.className = nomeValido ? "campo-verde" : "campo-rosso";
         sigla.className = siglaValida ? "campo-verde" : "campo-rosso";
         aggiungi.disabled = !(nomeValido && siglaValida && formMateria.querySelector('input[name="percorso"]:checked'));

@@ -72,7 +72,7 @@ def _dati_docente(doc, prog: Programmazione, giorno: str) -> None:
 
 
 def _titolo_unita(modulo: int, unita: int) -> str:
-    return f"UNITA' DIDATTICA N\u00b0{unita} DEL MODULO N\u00b0{modulo}"
+    return f"UNITA' DI APPRENDIMENTO N\u00b0{unita} DEL MODULO N\u00b0{modulo}"
 
 
 # --------------------------------------------------------------------------- documenti
@@ -85,7 +85,7 @@ def _sezione_modulo(doc, mod: Modulo, numero: int, *, con_spazi: bool) -> None:
         return
     _paragrafo(
         doc,
-        f"Il presente modulo costituito da {len(mod.unita)} unita' didattiche viene eseguito "
+        f"Il presente modulo costituito da {len(mod.unita)} unita' di apprendimento viene eseguito "
         f"nel seguente periodo dell'anno: {mod.periodo}",
     )
     tabella = _tabella(doc, 2, colonne_strette=(1,))
@@ -108,7 +108,13 @@ def _sezione_unita(doc, ud: UnitaDidattica, modulo: int, indice: int) -> None:
 
     tabella = _tabella(doc, 2, colonne_strette=(1,))
     _intestazione_unita(tabella, "IN QUALE QUADRO MULTIDISCIPLINARE E' INSERITA L'U.D")
-    diciture = ["NESSUNO", "EDUCAZIONE CIVICA", "SICUREZZA CLASSI PRIME", "ALTRO \u2026..."]
+    diciture = [
+        "NESSUNO",
+        "EDUCAZIONE CIVICA",
+        "SICUREZZA CLASSI PRIME",
+        "ALTRO \u2026...",
+        "SCIENZE SPERIMENTALI",
+    ]
     for posizione, dicitura in enumerate(diciture, start=1):
         _riga_tabella(tabella, [dicitura, "X" if posizione in ud.multidisciplinare else ""])
     if 4 in ud.multidisciplinare and ud.multidisciplinare_altro.strip():
@@ -116,7 +122,7 @@ def _sezione_unita(doc, ud: UnitaDidattica, modulo: int, indice: int) -> None:
 
     _paragrafo(
         doc,
-        "CONTRIBUTO DELL'UNITA' DIDATTICA AL CONSEGUIMENTO DELLE COMPETENZE CHIAVE EUROPA",
+        "CONTRIBUTO DELL'UNITA' DI APPRENDIMENTO AL CONSEGUIMENTO DELLE COMPETENZE CHIAVE EUROPA",
         grassetto=True,
     )
     tabella = _tabella(doc, 3, colonne_strette=(0, 2))
@@ -133,7 +139,7 @@ def _sezione_unita(doc, ud: UnitaDidattica, modulo: int, indice: int) -> None:
 
     _paragrafo(
         doc,
-        "CONTRIBUTO DELL'UNITA' DIDATTICA AL CONSEGUIMENTO DELLE COMPETENZE CHIAVE "
+        "CONTRIBUTO DELL'UNITA' DI APPRENDIMENTO AL CONSEGUIMENTO DELLE COMPETENZE CHIAVE "
         "DI CITTADINANZA",
         grassetto=True,
     )
@@ -146,30 +152,30 @@ def _sezione_unita(doc, ud: UnitaDidattica, modulo: int, indice: int) -> None:
 
     _blocco_elenco(
         doc,
-        "CONTRIBUTO DELL'UNITA' DIDATTICA AL CONSEGUIMENTO DELLE COMPETENZE RELATIVE AL "
+        "CONTRIBUTO DELL'UNITA' DI APPRENDIMENTO AL CONSEGUIMENTO DELLE COMPETENZE RELATIVE AL "
         "PROFILO EDUCATIVO CULTURALE E PROFESSIONALE (PECUP) DELLA DISCIPLINA",
         ud.competenze_pecup,
         ud.codici_competenze_pecup,
     )
     _blocco_elenco(
         doc,
-        "CONTRIBUTO DELL'UNITA' DIDATTICA AL CONSEGUIMENTO DELLE ABILITA' RELATIVE AL "
+        "CONTRIBUTO DELL'UNITA' DI APPRENDIMENTO AL CONSEGUIMENTO DELLE ABILITA' RELATIVE AL "
         "PROFILO EDUCATIVO CULTURALE E PROFESSIONALE (PECUP) DELLA DISCIPLINA",
         ud.abilita,
         ud.codici_abilita,
     )
     _blocco_elenco(
         doc,
-        "CONTRIBUTO DELL'UNITA' DIDATTICA AL CONSEGUIMENTO DELLE CONOSCENZE RELATIVE AL "
+        "CONTRIBUTO DELL'UNITA' DI APPRENDIMENTO AL CONSEGUIMENTO DELLE CONOSCENZE RELATIVE AL "
         "PROFILO EDUCATIVO CULTURALE E PROFESSIONALE (PECUP) DELLA DISCIPLINA",
         ud.conoscenze,
         ud.codici_conoscenze,
     )
 
     tabella = _tabella(doc, 1)
-    _intestazione_unita(tabella, "LIVELLI DI COMPETENZA DELLA UNITA' DIDATTICA")
+    _intestazione_unita(tabella, "LIVELLI DI COMPETENZA DELLA UNITA' DI APPRENDIMENTO")
     livelli = [
-        ("BASE (determina gli obiettivi fondanti dell'unita' didattica):", ud.competenze_minime),
+        ("BASE (determina gli obiettivi fondanti dell'unita' di apprendimento):", ud.competenze_minime),
         (
             "INTERMEDIO (in aggiunta a quanto descritto per il livello BASE):",
             ud.competenze_intermedie,
@@ -292,7 +298,7 @@ def _documento_certificazione(prog: Programmazione, giorno: str) -> Document:
     _paragrafo(
         doc,
         "(*) Le competenze prese in considerazione possono essere differenti tra le diverse "
-        "unita' didattiche",
+        "unita' di apprendimento",
         corpo=9,
     )
     _paragrafo(
@@ -308,13 +314,13 @@ def _documento_certificazione(prog: Programmazione, giorno: str) -> Document:
         for indice, ud in enumerate(mod.unita, start=1):
             _paragrafo(
                 doc,
-                f"COMPETENZE IN CHIAVE EUROPEA CERTIFICATE NELL'UNITA' DIDATTICA N\u00b0{indice}",
+                f"COMPETENZE IN CHIAVE EUROPEA CERTIFICATE NELL'UNITA' DI APPRENDIMENTO N\u00b0{indice}",
                 grassetto=True,
                 centrato=True,
                 corpo=12,
                 sottolineato=True,
             )
-            _paragrafo(doc, "TITOLO UNITA DIDATTICA:", grassetto=True)
+            _paragrafo(doc, "TITOLO UNITA DI APPRENDIMENTO:", grassetto=True)
             _paragrafo(doc, ud.titolo)
             _paragrafo(doc, "ARGOMENTI TRATTATI", grassetto=True)
             _testo_multiriga(doc, ud.argomenti)

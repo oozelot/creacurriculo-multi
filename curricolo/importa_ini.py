@@ -36,7 +36,7 @@ def leggi_righe(percorso: Path) -> dict[tuple[int, int], dict[int, str]]:
             continue
         codice, resto = riga[:cifre], riga[cifre:]
         valore = resto.partition(SEPARATORE_INI)[2]
-        # Il generatore VB6 scrive 7 cifre quando l'unita' didattica e' la decima.
+        # Il generatore VB6 scrive 7 cifre quando l'unita' di apprendimento e' la decima.
         if cifre == 6:
             modulo, unita, campo = int(codice[0:2]), int(codice[2:4]), int(codice[4:6])
         else:
@@ -51,7 +51,8 @@ def _unita(valori: dict[int, str]) -> dict[str, Any]:
         "titolo": valori.get(1, ""),
         "argomenti": da_multiline(valori.get(2, "")),
         "prerequisiti": da_multiline(valori.get(3, "")),
-        "multidisciplinare": _posizioni_valorizzate(valori, 4, 4),
+        "multidisciplinare": _posizioni_valorizzate(valori, 4, 4)
+        + ([5] if (valori.get(74) or "").strip() else []),
         "multidisciplinare_altro": valori.get(8, ""),
         "abilita": _testi(valori, 9, 9, multilinea=True),
         "codici_abilita": _testi(valori, 18, 9, multilinea=False),
@@ -64,6 +65,10 @@ def _unita(valori: dict[int, str]) -> dict[str, Any]:
         "competenze_minime": da_multiline(valori.get(71, "")),
         "competenze_intermedie": da_multiline(valori.get(72, "")),
         "competenze_avanzate": da_multiline(valori.get(73, "")),
+        "ec_voci": [voce.strip() for voce in valori.get(75, "").split("@") if voce.strip()],
+        "ec_ore": valori.get(76, "").strip(),
+        "ec_periodo": valori.get(77, "").strip(),
+        "ec_quadrimestre": valori.get(78, "").strip(),
     }
 
 

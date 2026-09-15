@@ -6,7 +6,7 @@
 
     <form method="get" id="selezione">
         <div class="colonne">
-            <fieldset style="max-width:170px">
+            <fieldset class="selezione-stato" id="selezione-classi" style="max-width:170px">
                 <legend>Selez. classi</legend>
                 {% for voce in classi %}
                 <label class="scelta"><input type="radio" name="classe" value="{{ voce }}"
@@ -15,7 +15,7 @@
                 {% endfor %}
             </fieldset>
 
-            <fieldset style="max-width:260px">
+            <fieldset class="selezione-stato" id="selezione-indirizzi" style="max-width:260px">
                 <legend>Indirizzo</legend>
                 {% for voce in indirizzi %}
                 <label class="scelta {{ 'disabilitata' if loop.index > 4 and not triennio }}">
@@ -26,13 +26,13 @@
                 {% endfor %}
             </fieldset>
 
-            <fieldset>
+            <fieldset class="selezione-stato" id="selezione-aree">
                 <legend>Area/e multidisciplinari disponibili</legend>
                 {% if disponibili %}
                 {% for voce in disponibili %}
                 <label class="scelta"><input type="checkbox" name="area" form="creazione"
                         value="{{ voce.nome }}"> {{ voce.nome }}
-                    <span class="nota">({{ voce.quante }} u.d.)</span></label>
+                    <span class="nota">({{ voce.quante }} UDA)</span></label>
                 {% endfor %}
                 {% else %}
                 <p class="nota">Selezionare una classe e almeno un indirizzo per vedere le aree
@@ -42,35 +42,71 @@
         </div>
     </form>
 
-    <form method="post" action="{{ url_for('admin_crea_multidisciplinare') }}" id="creazione">
+    <form method="post" action="{{ url_for('admin_crea_multidisciplinare') }}" id="creazione" data-creazione-documento>
         <input type="hidden" name="classe" value="{{ classe }}">
         {% for voce in scelti %}
         <input type="hidden" name="indirizzo" value="{{ voce }}">
         {% endfor %}
         <div class="barra">
-            <button type="submit" id="crea-documento" {{ 'disabled' if not disponibili }}>Crea documento</button>
+            <button type="submit" name="formato" value="word" id="crea-documento" {{ 'disabled' if not disponibili }}>Crea documento Word</button>
+            <button type="submit" name="formato" value="pdf" formaction="{{ url_for('admin_crea_multidisciplinare', formato='pdf') }}" id="crea-documento-pdf" {{ 'disabled' if not disponibili }}>Crea documento PDF</button>
         </div>
     </form>
 
-    {% if documento %}
-    <div class="barra">
-        <span>Documento creato: <strong>{{ documento }}</strong></span>
-        <form method="post" action="{{ url_for('admin_apri') }}">
-            <input type="hidden" name="nome" value="{{ documento }}">
-            <button type="submit">Apri il documento</button>
-        </form>
-        <a class="bottone" href="{{ url_for('admin_scarica', nome=documento) }}">Scarica</a>
+    {% if documento or documento_word %}
+    <div class="barra" style="flex-direction: column; align-items: flex-start;">
+        {% if documento %}
+        <div class="barra">
+            <span>Documento creato: <strong>{{ documento }}</strong></span>
+            <form method="post" action="{{ url_for('admin_apri') }}">
+                <input type="hidden" name="nome" value="{{ documento }}">
+                <button type="submit">Apri</button>
+            </form>
+            <a class="bottone" href="{{ url_for('admin_scarica', nome=documento) }}">Scarica</a>
+        </div>
+        {% endif %}
+        {% if documento_word and documento_word != documento %}
+        <div class="barra">
+            <span>Documento Word: <strong>{{ documento_word }}</strong></span>
+            <form method="post" action="{{ url_for('admin_apri') }}">
+                <input type="hidden" name="nome" value="{{ documento_word }}">
+                <button type="submit">Apri Word</button>
+            </form>
+            <a class="bottone" href="{{ url_for('admin_scarica', nome=documento_word) }}">Scarica Word</a>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 </fieldset>
 <script>
     const creaDocumento = document.getElementById("crea-documento");
+    const creaDocumentoPdf = document.getElementById("crea-documento-pdf");
+    const classi = document.querySelectorAll('input[name="classe"]');
+    const indirizzi = document.querySelectorAll('input[name="indirizzo"]');
     const aree = document.querySelectorAll('input[name="area"]');
 
     function aggiornaCreazione() {
-        creaDocumento.disabled = ![...aree].some(casella => casella.checked);
+        const classeSelezionata = [...classi].some(casella => casella.checked);
+        const indirizzoSelezionato = [...indirizzi].some(casella => casella.checked);
+        const areaSelezionata = [...aree].some(casella => casella.checked);
+        const stati = [
+            ["selezione-classi", classeSelezionata],
+            ["selezione-indirizzi", indirizzoSelezionato],
+            ["selezione-aree", areaSelezionata],
+        ];
+        stati.forEach(([id, completo]) => {
+            document.getElementById(id).classList.toggle("completa", completo);
+            document.getElementById(id).classList.toggle("incompleta", !completo);
+        });
+        const disponibile = classeSelezionata && indirizzoSelezionato && areaSelezionata;
+        creaDocumento.disabled = !disponibile;
+        if (creaDocumentoPdf) {
+            creaDocumentoPdf.disabled = !disponibile;
+        }
     }
 
+    classi.forEach(casella => casella.addEventListener("change", aggiornaCreazione));
+    indirizzi.forEach(casella => casella.addEventListener("change", aggiornaCreazione));
     aree.forEach(casella => casella.addEventListener("change", aggiornaCreazione));
     aggiornaCreazione();
 </script>

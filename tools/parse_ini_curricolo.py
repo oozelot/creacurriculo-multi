@@ -4,7 +4,7 @@ Formato reale verificato sui file prodotti dall'applicazione:
 - encoding sorgente: cp1252
 - separatore chiave/valore: byte 0xA7 ("§"), non il tilde '~' documentato nei commenti VB6
 - ogni riga dato ha un codice di 6 cifre NNMMYY: NN=modulo (00=sezione base),
-  MM=unita' didattica (00=dati generali del modulo), YY=progressivo campo
+  MM=unita' di apprendimento (00=dati generali del modulo), YY=progressivo campo
 - i testi multiriga usano '@' come separatore di riga (vedi Module3.bas risolvimultiline)
 
 Questo script non modifica alcun file: legge e riporta soltanto.
@@ -96,7 +96,7 @@ class Programmazione:
 
 
 def iter_record_lines(path: Path):
-    # Bug noto del generatore VB6: quando l'unita' didattica e' la decima,
+    # Bug noto del generatore VB6: quando l'unita' di apprendimento e' la decima,
     # il codice campo diventa di 7 cifre invece di 6 (viene scritto "0" & CStr(unita)
     # senza troncare a 2 cifre, es. unita=10 -> "010" invece di "10").
     # Si gestiscono quindi entrambe le lunghezze valide (6 e 7).
@@ -203,7 +203,7 @@ def validate_directory(directory: Path) -> int:
             for ud in mod.unita.values():
                 if ud.sconosciuti:
                     problemi.append(
-                        f"modulo {mod.numero} UD {ud.unita}: {len(ud.sconosciuti)} campi sconosciuti"
+                        f"modulo {mod.numero} UDA {ud.unita}: {len(ud.sconosciuti)} campi sconosciuti"
                     )
         if not prog.campi.get("cognome") or not prog.campi.get("disciplina"):
             problemi.append("dati anagrafici base incompleti (cognome/disciplina)")
@@ -216,7 +216,7 @@ def validate_directory(directory: Path) -> int:
     print(f"File analizzati: {len(files)}")
     print(f"File con avvisi: {file_con_problemi}")
     print(f"Totale moduli:   {totale_moduli}")
-    print(f"Totale unita' didattiche: {totale_unita}")
+    print(f"Totale unita' di apprendimento: {totale_unita}")
     return 0 if file_con_problemi == 0 else 2
 
 

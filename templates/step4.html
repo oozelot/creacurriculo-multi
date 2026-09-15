@@ -21,9 +21,9 @@
         <td>Modulo {{ loop.index }}</td>
         <td>{% if mod.completo %}<span class="ok">completo</span>{% else %}<span class="ko">incompleto</span>{% endif %}</td>
         <td>
-            {{ mod.titolo | pulito or "(senza titolo)" }} &mdash; {{ mod.unita | length }} unita' didattiche
+            {{ mod.titolo | pulito or "(senza titolo)" }} &mdash; {{ mod.unita | length }} unita' di apprendimento
             {% for ud in mod.unita %}
-            {% if not ud.completa %}<br><span class="ko">U.D. {{ loop.index }} incompleta</span>{% endif %}
+            {% if not ud.completa %}<br><span class="ko">UDA {{ loop.index }} incompleta</span>{% endif %}
             {% endfor %}
         </td>
     </tr>

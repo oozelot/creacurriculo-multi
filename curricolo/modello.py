@@ -30,10 +30,14 @@ class UnitaDidattica:
     titolo: str = ""
     argomenti: str = ""
     prerequisiti: str = ""
-    # Posizioni valorizzate fra 1=NO, 2=ed. civica, 3=sicurezza, 4=altro. E' una lista
+    # Posizioni valorizzate fra 1=NO, 2=ed. civica, 3=sicurezza, 4=altro, 5=scienze sperimentali. E' una lista
     # perche' il VB6 poteva lasciarne piu' d'una scritta nel file e non va alterata.
     multidisciplinare: list[int] = field(default_factory=lambda: [1])
     multidisciplinare_altro: str = ""
+    ec_voci: list[str] = field(default_factory=list)
+    ec_ore: str = ""
+    ec_periodo: str = ""
+    ec_quadrimestre: str = ""
     abilita: list[str] = field(default_factory=lambda: [""] * MAX_ABILITA)
     codici_abilita: list[str] = field(default_factory=lambda: [""] * MAX_ABILITA)
     conoscenze: list[str] = field(default_factory=lambda: [""] * MAX_CONOSCENZE)
@@ -64,6 +68,10 @@ class UnitaDidattica:
             prerequisiti=dati.get("prerequisiti", ""),
             multidisciplinare=[int(n) for n in dati.get("multidisciplinare") or [1]],
             multidisciplinare_altro=dati.get("multidisciplinare_altro", ""),
+            ec_voci=[str(v) for v in dati.get("ec_voci", [])],
+            ec_ore=str(dati.get("ec_ore", "")),
+            ec_periodo=str(dati.get("ec_periodo", "")),
+            ec_quadrimestre=str(dati.get("ec_quadrimestre", "")),
             abilita=_lista(dati.get("abilita"), MAX_ABILITA),
             codici_abilita=_lista(dati.get("codici_abilita"), MAX_ABILITA),
             conoscenze=_lista(dati.get("conoscenze"), MAX_CONOSCENZE),
