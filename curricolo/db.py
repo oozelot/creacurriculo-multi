@@ -200,6 +200,14 @@ def sigla_ini_da_sigla(sigla: str, nome: str) -> str:
 def inizializza_database() -> None:
     """Crea il database e ricostruisce il catalogo se manca del tutto."""
     database_nuovo = not FILE_DB.exists()
+    factory = next(
+        (percorso for percorso in (FILE_DB_FACTORY, FILE_DB_FACTORY_ALTERNATIVO) if percorso.is_file()),
+        None,
+    )
+    if database_nuovo and factory is not None:
+        CARTELLA_DATI.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(factory, FILE_DB)
+        database_nuovo = False
     with connessione() as conn:
         catalogo_vuoto = conn.execute("SELECT COUNT(*) FROM classi").fetchone()[0] == 0
     if database_nuovo or catalogo_vuoto:
