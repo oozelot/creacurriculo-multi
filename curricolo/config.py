@@ -3,7 +3,8 @@
 from pathlib import Path
 import sys
 
-RADICE = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
+E_FROZEN = getattr(sys, "frozen", False)
+RADICE = Path(sys.executable).resolve().parent if E_FROZEN else Path(__file__).resolve().parent.parent
 RISORSE = Path(getattr(sys, "_MEIPASS", RADICE))
 
 CARTELLA_LEGACY = RISORSE / "do_not_use"
@@ -20,9 +21,8 @@ CARTELLA_RICEVUTI = CARTELLA_ADMIN / "file_ricevuti"
 CARTELLA_ADMIN_INPUT = CARTELLA_ADMIN / "input"
 CARTELLA_ADMIN_OUTPUT = CARTELLA_ADMIN / "output"
 
-# Le cartelle dei docenti stanno accanto al programma, come nel VB6:
 # <COGNOME_NOME>/<CLASSE_INDIRIZZO_DISCIPLINA>/do_not_use/...
-CARTELLA_LAVORI = RADICE
+CARTELLA_LAVORI = RADICE / "lavori" if E_FROZEN else RADICE
 
 # Il VB6 scriveva e leggeva tutto in ANSI Windows con fine riga CRLF.
 ENCODING_INI = "cp1252"

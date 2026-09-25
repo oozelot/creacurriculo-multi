@@ -32,3 +32,8 @@ Aprire quindi `http://127.0.0.1:5000`.
 La build PyInstaller deve essere eseguita sul sistema operativo di destinazione. Il workflow GitHub Actions in `.github/workflows/build.yml` crea pacchetti separati per Windows, macOS e Linux con il nome `CreaCurricoloMulti`.
 
 LibreOffice resta una dipendenza di sistema e non viene incorporato nell'eseguibile.
+
+I dati creati dall'applicazione sono salvati accanto all'eseguibile: il database e
+le cartelle ADMIN restano nella cartella della distribuzione, mentre le cartelle
+dei docenti vengono create nella sottocartella `lavori`. Le risorse incluse nel
+pacchetto non vengono usate come archivio dei dati generati.
