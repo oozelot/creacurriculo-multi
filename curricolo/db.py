@@ -251,7 +251,7 @@ def _inizializza_educazione_civica_factory() -> None:
 
 
 def resetta_database() -> None:
-    """Svuota il database senza rimuovere il file, poi ricrea il catalogo base."""
+    """Azzera i dati locali e ricrea anche la configurazione civica iniziale."""
     with connessione() as conn:
         tabelle = [
             riga["name"]
@@ -268,8 +268,10 @@ def resetta_database() -> None:
 
     if importa_cataloghi() != 0:
         raise RuntimeError("Impossibile ricostruire il catalogo di base.")
-        from . import educazione_civica
-        educazione_civica.sincronizza_catalogo_file()
+    from . import educazione_civica
+    educazione_civica.sincronizza_catalogo_file()
+    if not ripristina_educazione_civica_backup():
+        raise RuntimeError("Impossibile ripristinare la configurazione iniziale di Educazione civica.")
 
 
 def ripristina_database_factory() -> bool:

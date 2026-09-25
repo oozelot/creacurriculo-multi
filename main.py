@@ -48,6 +48,7 @@ from curricolo.config import (
     CARTELLA_DATI,
     CARTELLA_LAVORI,
     CARTELLA_RICEVUTI,
+    CARTELLA_RICEVUTI_SEME,
     CLASSI,
     COMPETENZE_CITTADINANZA,
     COMPETENZE_EUROPEE,
@@ -82,6 +83,11 @@ _HEARTBEAT_LOCK = threading.Lock()
 def prepara_cartelle_admin() -> None:
     for cartella in (CARTELLA_ADMIN, CARTELLA_ADMIN_INPUT, CARTELLA_RICEVUTI, CARTELLA_ADMIN_OUTPUT):
         cartella.mkdir(parents=True, exist_ok=True)
+    if CARTELLA_RICEVUTI_SEME.resolve() != CARTELLA_RICEVUTI.resolve():
+        for sorgente in CARTELLA_RICEVUTI_SEME.glob("*.ini"):
+            destinazione = CARTELLA_RICEVUTI / sorgente.name
+            if not destinazione.exists():
+                shutil.copy2(sorgente, destinazione)
     CARTELLA_DATI.mkdir(parents=True, exist_ok=True)
     CARTELLA_LAVORI.mkdir(parents=True, exist_ok=True)
 
@@ -756,7 +762,11 @@ def admin_reset():
     db.resetta_database()
     prepara_cartelle_admin()
     _sessione_inizializzata = True
-    flash("Lavoro e dati locali azzerati. Il catalogo di base e' stato ricostruito.", "info")
+    flash(
+        "Lavoro e dati locali azzerati. Il catalogo e la configurazione iniziale "
+        "di Educazione civica sono stati ripristinati.",
+        "info",
+    )
     return redirect(url_for("step1"))
 
 

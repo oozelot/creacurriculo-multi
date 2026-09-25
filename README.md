@@ -31,9 +31,13 @@ Aprire quindi `http://127.0.0.1:5000`.
 
 La build PyInstaller deve essere eseguita sul sistema operativo di destinazione. Il workflow GitHub Actions in `.github/workflows/build.yml` crea pacchetti separati per Windows, macOS e Linux con il nome `CreaCurricoloMulti`.
 
-LibreOffice resta una dipendenza di sistema e non viene incorporato nell'eseguibile.
+La generazione dei documenti Word non richiede Microsoft Office o LibreOffice.
+Per esportare in PDF l'applicazione usa, in ordine, LibreOffice e Microsoft Word
+(tramite `pywin32` su Windows). Se nessuno dei due e' disponibile, il documento
+Word viene comunque creato e l'applicazione comunica che occorre installare
+LibreOffice o Microsoft Word per completare l'esportazione PDF.
 
-I dati creati dall'applicazione sono salvati accanto all'eseguibile: il database e
-le cartelle ADMIN restano nella cartella della distribuzione, mentre le cartelle
-dei docenti vengono create nella sottocartella `lavori`. Le risorse incluse nel
-pacchetto non vengono usate come archivio dei dati generati.
+I dati creati dall'applicazione sono salvati accanto all'eseguibile nella cartella
+della distribuzione: il database, le cartelle `ADMIN` e le cartelle dei docenti
+vengono creati direttamente nell'AppPath. Le risorse incluse nel pacchetto non
+vengono usate come archivio dei dati generati.

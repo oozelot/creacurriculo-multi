@@ -18,11 +18,15 @@ FILE_DB_FACTORY_ALTERNATIVO = RADICE / "curricolobak.db"
 
 CARTELLA_ADMIN = RADICE / "ADMIN"
 CARTELLA_RICEVUTI = CARTELLA_ADMIN / "file_ricevuti"
+CARTELLA_RICEVUTI_SEME = RISORSE / "ADMIN" / "file_ricevuti"
 CARTELLA_ADMIN_INPUT = CARTELLA_ADMIN / "input"
 CARTELLA_ADMIN_OUTPUT = CARTELLA_ADMIN / "output"
 
 # <COGNOME_NOME>/<CLASSE_INDIRIZZO_DISCIPLINA>/do_not_use/...
-CARTELLA_LAVORI = RADICE / "lavori" if E_FROZEN else RADICE
+# In una distribuzione PyInstaller RADICE e' la cartella dell'eseguibile:
+# i dati generati devono restare direttamente nell'AppPath, non nelle risorse
+# temporanee di _MEIPASS ne' in una sottocartella separata.
+CARTELLA_LAVORI = RADICE
 
 # Il VB6 scriveva e leggeva tutto in ANSI Windows con fine riga CRLF.
 ENCODING_INI = "cp1252"

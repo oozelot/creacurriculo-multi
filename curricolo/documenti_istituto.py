@@ -9,6 +9,7 @@ senza campi modulo, e salvati in ADMIN/output.
 from __future__ import annotations
 
 from datetime import date, datetime
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -335,7 +336,7 @@ def _salva(doc: Document, nome: str) -> Path:
 
 
 def converti_pdf(percorso_word: Path) -> Path:
-    """Converte un documento Word in PDF tramite LibreOffice headless."""
+    """Converte un documento Word in PDF usando LibreOffice o Microsoft Word."""
     percorso_word = Path(percorso_word).resolve()
     if not percorso_word.is_file():
         raise FileNotFoundError(f"File Word non trovato: {percorso_word}")
@@ -356,32 +357,58 @@ def converti_pdf(percorso_word: Path) -> Path:
     if Path("/Applications/LibreOffice.app/Contents/MacOS/soffice").is_file():
         comandi.append("/Applications/LibreOffice.app/Contents/MacOS/soffice")
     eseguibile = next((comando for comando in comandi if comando), None)
-    if eseguibile is None:
-        raise RuntimeError(
-            "LibreOffice non e' installato o non e' stato trovato. "
-            "Installarlo per convertire il file Word in PDF. Il documento Word e' stato comunque creato."
-        )
-
-    with tempfile.TemporaryDirectory(prefix="creacurricolo-lo-") as profilo:
-        comando = [
-            eseguibile,
-            "--headless",
-            "--convert-to", "pdf:writer_pdf_Export",
-            "--outdir", str(percorso_pdf.parent),
-            f"-env:UserInstallation={Path(profilo).as_uri()}",
-            str(percorso_word),
-        ]
-        risultato = subprocess.run(
-            comando,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            check=False,
-        )
-    if risultato.returncode != 0 or not percorso_pdf.is_file():
+    if eseguibile is not None:
+        with tempfile.TemporaryDirectory(prefix="creacurricolo-lo-") as profilo:
+            comando = [
+                eseguibile,
+                "--headless",
+                "--convert-to", "pdf:writer_pdf_Export",
+                "--outdir", str(percorso_pdf.parent),
+                f"-env:UserInstallation={Path(profilo).as_uri()}",
+                str(percorso_word),
+            ]
+            risultato = subprocess.run(
+                comando,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+        if risultato.returncode == 0 and percorso_pdf.is_file():
+            return percorso_pdf
         dettaglio = (risultato.stderr or risultato.stdout).strip()
-        raise RuntimeError(
-            "LibreOffice non ha prodotto il PDF."
-            + (f" Dettaglio: {dettaglio}" if dettaglio else "")
-        )
-    return percorso_pdf
+    else:
+        dettaglio = ""
+
+    if os.name == "nt":
+        try:
+            import pythoncom
+            import win32com.client
+        except ImportError:
+            pass
+        else:
+            pythoncom.CoInitialize()
+            word = None
+            documento = None
+            try:
+                word = win32com.client.DispatchEx("Word.Application")
+                word.Visible = False
+                documento = word.Documents.Open(str(percorso_word))
+                documento.SaveAs2(str(percorso_pdf), FileFormat=17)
+                if percorso_pdf.is_file():
+                    return percorso_pdf
+            except Exception as errore:
+                dettaglio = str(errore)
+            finally:
+                if documento is not None:
+                    documento.Close(False)
+                if word is not None:
+                    word.Quit()
+                pythoncom.CoUninitialize()
+
+    raise RuntimeError(
+        "Impossibile convertire il documento Word in PDF. "
+        "Installare LibreOffice oppure Microsoft Word. Il documento Word "
+        "e' stato comunque creato."
+        + (f" Dettaglio: {dettaglio}" if dettaglio else "")
+    )

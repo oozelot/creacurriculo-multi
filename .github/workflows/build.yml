@@ -42,6 +42,18 @@ jobs:
       run: |
         python tools/pulisci_build.py
         python -m PyInstaller --clean --noconfirm CreaCurricolo.spec
+        python -m compileall -q main.py curricolo
+
+    - name: Verifica pacchetto prodotto
+      run: |
+        test -f "dist/CreaCurricoloMulti/CreaCurricoloMulti${{ runner.os == 'Windows' && '.exe' || '' }}"
+        test -d "dist/CreaCurricoloMulti/_internal"
+      shell: bash
+
+    - name: Rendi eseguibile il launcher Unix
+      if: runner.os != 'Windows'
+      run: chmod +x dist/CreaCurricoloMulti/CreaCurricoloMulti
+      shell: bash
 
     - name: Salva l'eseguibile come pacchetto
       uses: actions/upload-artifact@v5

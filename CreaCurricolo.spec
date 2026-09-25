@@ -1,6 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+import sys
+
 hiddenimports = ['openpyxl']
+if sys.platform == 'win32':
+    hiddenimports.extend(['pythoncom', 'pywintypes', 'win32com', 'win32com.client'])
+file_ricevuti = [
+    (str(percorso), 'ADMIN/file_ricevuti')
+    for percorso in Path('ADMIN/file_ricevuti').glob('*.ini')
+]
 
 
 a = Analysis(
@@ -10,6 +19,7 @@ a = Analysis(
     datas=[
         ('templates', 'templates'),
         ('do_not_use', 'do_not_use'),
+        *file_ricevuti,
         ('codici competenze.pdf', '.'),
         ('curricolobak.db', '.'),
     ],
