@@ -23,10 +23,37 @@ def copia_tabella(destinazione: sqlite3.Connection, origine: sqlite3.Connection,
     )
 
 
+def ricrea_snapshot(connessione: sqlite3.Connection) -> None:
+    connessione.execute("DELETE FROM educazione_civica_backup")
+    contesti = connessione.execute(
+        "SELECT DISTINCT corso, classe FROM educazione_civica_piani ORDER BY corso, classe"
+    ).fetchall()
+    for corso, classe in contesti:
+        piani = connessione.execute(
+            "SELECT articolazione, disciplina, dati FROM educazione_civica_piani "
+            "WHERE corso = ? AND classe = ? ORDER BY articolazione, disciplina",
+            (corso, classe),
+        ).fetchall()
+        dump = __import__("json").dumps(
+            [
+                {"articolazione": riga[0], "disciplina": riga[1], "dati": riga[2]}
+                for riga in piani
+            ],
+            ensure_ascii=False,
+        )
+        connessione.execute(
+            "INSERT INTO educazione_civica_backup (corso, classe, dump) VALUES (?, ?, ?)",
+            (corso, classe, dump),
+        )
+
+
 def main() -> None:
     sicurezza = FACTORY.with_name("curricolobak.prima-educazione-civica.db")
     shutil.copy2(FACTORY, sicurezza)
     try:
+        with sqlite3.connect(OPERATIVO) as origine:
+            ricrea_snapshot(origine)
+            origine.commit()
         with sqlite3.connect(OPERATIVO) as origine, sqlite3.connect(FACTORY) as destinazione:
             destinazione.execute(
                 """
@@ -40,7 +67,7 @@ def main() -> None:
                 """
             )
             copia_tabella(destinazione, origine, "educazione_civica_piani")
-            copia_tabella(destinazione, origine, "educazione_civica_backup")
+            ricrea_snapshot(destinazione)
             destinazione.commit()
     except Exception:
         shutil.copy2(sicurezza, FACTORY)
