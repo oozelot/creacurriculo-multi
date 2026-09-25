@@ -13,8 +13,10 @@ CARTELLA_PROGRAMMAZIONE = CARTELLA_LEGACY / "programmazione"
 
 CARTELLA_DATI = RADICE / "dati"
 FILE_DB = CARTELLA_DATI / "curricolo.db"
-FILE_DB_FACTORY = RISORSE / "curricolobak.db"
-FILE_DB_FACTORY_ALTERNATIVO = RADICE / "curricolobak.db"
+FILE_DB_MASTER = RISORSE / "curricolobak.db"
+FILE_DB_MASTER_ALTERNATIVO = RADICE / "curricolobak.db"
+FILE_DB_FACTORY = RADICE / "curricolobak-modificato.db"
+FILE_DB_FACTORY_ALTERNATIVO = RISORSE / "curricolobak-modificato.db"
 
 CARTELLA_ADMIN = RADICE / "ADMIN"
 CARTELLA_RICEVUTI = CARTELLA_ADMIN / "file_ricevuti"

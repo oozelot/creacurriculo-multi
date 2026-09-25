@@ -236,11 +236,11 @@ def master_factory():
         if password != "MASTER":
             flash("Password MASTER non valida. Nessuna modifica applicata.", "errore")
             return redirect(url_for("master_factory"))
-        if not db.ripristina_database_factory():
-            flash("Database factory assente o non valido. Nessuna modifica applicata.", "errore")
+        if not db.ripristina_database_master():
+            flash("Archivio master assente o non valido. Nessuna modifica applicata.", "errore")
             return redirect(url_for("master_factory"))
         session.clear()
-        flash("Database factory ripristinato correttamente.", "info")
+        flash("Master ripristinato: factory modificato e database operativo riallineati.", "info")
         return redirect(url_for("step1"))
     return render_template("master_factory.html")
 
@@ -778,13 +778,10 @@ def admin_reset_pecup():
     if not _password_admin_valida(password):
         flash("Password amministrativa non valida. Nessuna modifica applicata.", "errore")
         return redirect(request.referrer or url_for("admin_database"))
-    if not db.ripristina_pecup_backup():
-        db.backup_pecup_attuali()
-        db.ripristina_pecup_backup()
-    if not db.ripristina_educazione_civica_factory():
-        flash("Impossibile ripristinare la situazione iniziale di Educazione civica dal factory.", "errore")
+    if not db.ripristina_database_factory():
+        flash("Impossibile ripristinare l'archivio factory modificato.", "errore")
     else:
-        flash("Codici PECUP e situazione Educazione civica ripristinati allo stato iniziale.", "info")
+        flash("Codici PECUP e situazione Educazione civica ripristinati dal factory modificato.", "info")
     return redirect(url_for("admin_database"))
 
 
@@ -794,8 +791,10 @@ def admin_memorizza_pecup():
     if not _password_admin_valida(password):
         flash("Password amministrativa non valida. Nessuna modifica applicata.", "errore")
         return redirect(request.referrer or url_for("admin_database"))
-    db.backup_pecup_attuali()
-    flash("Codici PECUP attuali memorizzati come nuovo stato iniziale.", "info")
+    if db.memorizza_pecup_factory():
+        flash("Codici PECUP memorizzati nel factory modificato.", "info")
+    else:
+        flash("Impossibile aggiornare il factory modificato.", "errore")
     return redirect(url_for("admin_database"))
 
 
@@ -814,8 +813,10 @@ def admin_memorizza_educazione_civica():
     if corso not in ("CAT", "GRAFICO", "AGRARIO") or classe not in CLASSI:
         flash("Corso o anno scolastico non validi. Nessuna modifica applicata.", "errore")
         return redirect(request.referrer or url_for("admin_educazione_civica"))
-    db.backup_educazione_civica(corso, classe)
-    flash(f"Situazione Educazione civica memorizzata per {corso} {classe}.", "info")
+    if db.memorizza_educazione_civica_factory(corso, classe):
+        flash(f"Situazione Educazione civica memorizzata nel factory modificato per {corso} {classe}.", "info")
+    else:
+        flash("Impossibile aggiornare il factory modificato.", "errore")
     return redirect(url_for("admin_educazione_civica", corso=corso, classe=classe))
 
 
