@@ -781,10 +781,10 @@ def admin_reset_pecup():
     if not db.ripristina_pecup_backup():
         db.backup_pecup_attuali()
         db.ripristina_pecup_backup()
-    if not db.ripristina_educazione_civica_backup():
-        flash("Impossibile ripristinare la situazione di Educazione civica: archivio iniziale assente.", "errore")
+    if not db.ripristina_educazione_civica_factory():
+        flash("Impossibile ripristinare la situazione iniziale di Educazione civica dal factory.", "errore")
     else:
-        flash("Codici PECUP e situazione Educazione civica ripristinati all'ultimo stato memorizzato.", "info")
+        flash("Codici PECUP e situazione Educazione civica ripristinati allo stato iniziale.", "info")
     return redirect(url_for("admin_database"))
 
 

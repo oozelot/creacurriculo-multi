@@ -274,7 +274,7 @@ def resetta_database() -> None:
         raise RuntimeError("Impossibile ricostruire il catalogo di base.")
     from . import educazione_civica
     educazione_civica.sincronizza_catalogo_file()
-    if not ripristina_educazione_civica_backup() and not _ripristina_educazione_civica_da_factory():
+    if not _ripristina_educazione_civica_da_factory():
         raise RuntimeError("Impossibile ripristinare la configurazione iniziale di Educazione civica.")
 
 
@@ -450,6 +450,11 @@ def ripristina_educazione_civica_backup() -> bool:
                 )
         conn.commit()
     return True
+
+
+def ripristina_educazione_civica_factory() -> bool:
+    """Ripristina la configurazione iniziale civica dal database factory."""
+    return _ripristina_educazione_civica_da_factory()
 
 
 def _ripristina_educazione_civica_da_factory() -> bool:
