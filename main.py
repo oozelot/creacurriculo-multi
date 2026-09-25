@@ -1057,14 +1057,19 @@ def admin_file_impostazioni():
 @app.route("/admin/database/file/impostazioni-tutti", methods=["POST"])
 def admin_file_impostazioni_tutti():
     cartelle = []
-    errori = []
+    cartelle_non_create = []
     for percorso in archivio.file_ricevuti():
+        prog = None
         try:
-            cartelle.append(modello.salva(archivio.leggi_file(percorso)))
+            prog = archivio.leggi_file(percorso)
+            cartelle.append(modello.salva(prog))
         except (OSError, TypeError, ValueError, KeyError, IndexError, json.JSONDecodeError) as errore:
             app.logger.error("Creazione cartella fallita per %s: %s", percorso.name, errore)
-            errori.append(f"{percorso.name} ({type(errore).__name__})")
+            cartelle_non_create.append(
+                f"{prog.cartella_docente}\\{prog.cartella_corso}" if prog is not None else percorso.name
+            )
     for record in archivio.elenca():
+        prog = None
         try:
             prog = archivio.programmazione(record["id"])
             if prog is not None:
@@ -1072,13 +1077,15 @@ def admin_file_impostazioni_tutti():
         except (OSError, TypeError, ValueError, KeyError, IndexError, json.JSONDecodeError) as errore:
             nome = record.get("nome_file", str(record["id"]))
             app.logger.error("Creazione cartella fallita per %s: %s", nome, errore)
-            errori.append(f"{nome} ({type(errore).__name__})")
+            cartelle_non_create.append(
+                f"{prog.cartella_docente}\\{prog.cartella_corso}" if prog is not None else nome
+            )
     uniche = sorted({str(percorso.parent) for percorso in cartelle})
-    if errori:
+    if cartelle_non_create:
         flash(
             f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
-            f"Cartelle docenti create: {len(uniche)}. Errori ({len(errori)}): "
-            + " | ".join(errori),
+            f"Cartelle docenti create: {len(uniche)}. Cartelle non create ({len(cartelle_non_create)}): "
+            + " | ".join(cartelle_non_create),
             "errore",
         )
     else:

@@ -51,4 +51,4 @@ def test_crea_impostazioni_tutti_non_si_interrompe_per_un_file(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert "Elementi non elaborati" in response.get_data(as_text=True)
+    assert "Cartelle non create" in response.get_data(as_text=True)
