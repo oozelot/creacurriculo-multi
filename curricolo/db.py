@@ -307,6 +307,11 @@ def ripristina_database_factory() -> bool:
         shutil.copy2(factory, temporaneo)
         os.replace(temporaneo, FILE_DB)
         inizializza_backup_stato()
+        _salva_backup_educazione_civica_su_file()
+        with connessione() as conn:
+            piani = conn.execute("SELECT COUNT(*) FROM educazione_civica_piani").fetchone()[0]
+        if not piani:
+            return False
         return True
     finally:
         if temporaneo.exists():
@@ -427,6 +432,8 @@ def _ripristina_backup_educazione_civica_da_file() -> bool:
 
 def ripristina_educazione_civica_backup() -> bool:
     """Ripristina tutti i piani dagli ultimi snapshot memorizzati."""
+    if os.path.isfile(_percorso_backup_educazione_civica()):
+        _ripristina_backup_educazione_civica_da_file()
     with connessione() as conn:
         righe = conn.execute("SELECT corso, classe, dump FROM educazione_civica_backup").fetchall()
     if not righe:
