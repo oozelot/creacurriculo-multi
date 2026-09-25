@@ -1,0 +1,172 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+{% set modifica = materia_selezionata is not none %}
+{% set etichette_indirizzi = {
+    'COMUNE': 'COM',
+    'CAT': 'CAT',
+    'GRAFICO': 'GRA',
+    'AGRARIO (tutte le articolazioni)': 'AGR',
+    'AGRARIO (g.a.t.)': 'AGR (gat.)',
+    'AGRARIO (p.t.)': 'AGR (p.t.)',
+    'AGRARIO (eno)': 'AGR (eno)'
+} %}
+<fieldset class="gestione-materie">
+    <legend>Gestione materie</legend>
+    <div class="materie-layout">
+        <fieldset>
+            <legend>Materie configurate</legend>
+            <div class="lista-materie">
+                {% for materia in materie %}
+                <label class="materia {{ materia.avviso }} {{ 'completa' if materia.completa and not materia.avviso }}">
+                    <input type="radio" name="materia" value="{{ materia.id }}"
+                        {{ 'checked' if modifica and materia.id == materia_selezionata.id }}>
+                    <span title="{{ materia.nome }}">{{ materia.nome }}</span>
+                </label>
+                {% else %}
+                <p>Nessuna materia configurata.</p>
+                {% endfor %}
+            </div>
+            <div class="barra">
+                <form method="post" id="form-elimina">
+                    <button type="submit" id="elimina-materia" disabled>Elimina</button>
+                    <button type="button" id="modifica-materia" disabled>Modifica</button>
+                </form>
+            </div>
+            <p class="nota"><span class="campione giallo"></span> Nessun file INI ancora importato nel database.
+                <span class="campione arancione"></span> Mancano codici PECUP.</p>
+        </fieldset>
+
+        <fieldset>
+            <legend>{{ 'Modifica materia' if modifica else 'Aggiungi materia' }}</legend>
+            <form method="post" action="{{ url_for('admin_modifica_materia', identificativo=materia_selezionata.id) if modifica else url_for('admin_aggiungi_materia') }}" id="form-materia">
+                <label for="nome">Nome della materia</label>
+                <input type="text" id="nome" name="nome" maxlength="120" value="{{ materia_selezionata.nome if modifica else '' }}" required>
+                <label for="sigla">Sigla tecnica</label>
+                <input type="text" id="sigla" name="sigla" maxlength="3" list="suggerimenti-sigla" value="{{ materia_selezionata.sigla if modifica else '' }}" required>
+                <datalist id="suggerimenti-sigla"></datalist>
+                <p class="nota" id="guida-sigla">Scrivere 3 lettere o numeri, senza spazi.</p>
+
+                <p class="etichetta-matrice">Classi e indirizzi in cui la materia viene insegnata</p>
+                <div class="matrice-percorsi">
+                    <div></div>
+                    {% for indirizzo in indirizzi %}<strong title="{{ indirizzo }}">{{ etichette_indirizzi.get(indirizzo, indirizzo) }}</strong>{% endfor %}
+                    {% for classe in classi %}
+                    <strong>{{ classe }}</strong>
+                    {% for indirizzo in indirizzi %}
+                    {% set consentito = classe not in ['PRIMA', 'SECONDA'] or indirizzo not in indirizzi[4:] %}
+                    <label class="casella {{ '' if consentito else 'non-consentita' }}" title="{{ classe }} - {{ indirizzo }}">
+                        <input type="checkbox" name="percorso" value="{{ classe }}|{{ indirizzo }}"
+                            {{ 'checked' if modifica and (classe, indirizzo) in materia_selezionata.percorsi }} {{ 'disabled' if not consentito }}>
+                    </label>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+                <div class="barra"><button type="submit" id="aggiungi-materia" disabled>{{ 'Premi quando completato le modifiche' if modifica else 'Aggiungi' }}</button></div>
+            </form>
+        </fieldset>
+    </div>
+</fieldset>
+
+{% if modifica and request.args.get('pecup') == 'mancanti' %}
+<div class="velo"><div class="popup"><strong>Mancano codici PECUP</strong>
+    <p>Per uno o più percorsi selezionati mancano abilità, conoscenze o competenze PECUP.</p>
+    <div class="barra">
+        <form method="post" action="{{ url_for('admin_conferma_modifica_materia', identificativo=materia_selezionata.id) }}"><input type="hidden" name="azione" value="pecup"><button type="submit">Sì, gestisci codici PECUP</button></form>
+        <form method="post" action="{{ url_for('admin_conferma_modifica_materia', identificativo=materia_selezionata.id) }}"><input type="hidden" name="azione" value="salva"><button type="submit">No, salva e torna alla lista</button></form>
+        <form method="post" action="{{ url_for('admin_annulla_modifica_materia', identificativo=materia_selezionata.id) }}"><button type="submit">Annulla</button></form>
+    </div></div></div>
+{% endif %}
+<div class="velo nascosto" id="attendere"><div class="popup"><strong>Attendere...</strong><p>Caricamento dei dati della materia.</p></div></div>
+
+<style>
+    .materie-layout { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.55fr); gap: 10px; }
+    .materie-layout fieldset { min-width: 0; }
+    .lista-materie { height: 270px; overflow-y: auto; border: 1px solid #7f9db9; padding: 3px; }
+    .materia { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 4px; align-items: center; padding: 3px; }
+    .materia span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .materia.giallo { background-color: #fff59d !important; }
+    .materia.arancione { background-color: #ffb74d !important; }
+    .materia.completa { background-color: #b9f6a5 !important; }
+    .campione { display: inline-block; width: 12px; height: 12px; border: 1px solid #000; vertical-align: middle; }
+    .campione.giallo { background: #fff59d; }
+    .campione.arancione { background: #ffb74d; }
+    .etichetta-matrice { margin: 12px 0 4px; font-weight: bold; text-transform: uppercase; }
+    #form-materia input[type="text"] { font-weight: bold; }
+    .matrice-percorsi { display: grid; grid-template-columns: 80px repeat(7, 28px); gap: 1px; align-items: center; }
+    .matrice-percorsi strong { overflow: hidden; text-align: center; font-size: 8px; line-height: 1.1; white-space: normal; }
+    .casella { height: 22px; margin: 0; border: 1px solid #000; background: #ff3b30; text-align: center; }
+    .casella:has(input:checked) { background: #b9f6a5; }
+    .casella input { margin: 4px 0 0; }
+    .casella.non-consentita { background: #808080; }
+    .casella.non-consentita input { visibility: hidden; }
+    .campo-rosso { background: #ff3b30; }
+    .campo-verde { background: #b9f6a5; }
+    #aggiungi-materia:disabled { background: #ff3b30; color: #fff; }
+    #aggiungi-materia:not(:disabled) { background: #1b5e20; color: #ffeb3b; }
+    .velo { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); z-index: 10; }
+    .popup { max-width: 430px; padding: 16px; border: 2px solid #000; background: #fff; font-size: 12px; }
+    .nascosto { display: none; }
+    @media (max-width: 800px) { .materie-layout { grid-template-columns: 1fr; } }
+</style>
+<script>
+    const formMateria = document.getElementById("form-materia");
+    const nome = document.getElementById("nome");
+    const sigla = document.getElementById("sigla");
+    const aggiungi = document.getElementById("aggiungi-materia");
+    const suggerimentiSigla = document.getElementById("suggerimenti-sigla");
+    const attendere = document.getElementById("attendere");
+    function suggerimenti() {
+        const parole = nome.value.toUpperCase().match(/[A-Z0-9]+/g) || [];
+        const compatta = parole.join("");
+        const iniziali = parole.map(parola => parola[0]).join("");
+        const opzioni = [compatta.slice(0, 12), compatta.slice(0, 8), iniziali, `${iniziali}${compatta.slice(0, 6)}`]
+            .filter(opzione => opzione.length >= 3)
+            .filter((opzione, indice, elenco) => elenco.indexOf(opzione) === indice);
+        suggerimentiSigla.innerHTML = "";
+        opzioni.forEach(opzione => {
+            const voce = document.createElement("option");
+            voce.value = opzione;
+            suggerimentiSigla.appendChild(voce);
+        });
+        if (!sigla.value.trim() && opzioni.length) { sigla.value = opzioni[0]; }
+    }
+    function aggiornaAggiunta() {
+        suggerimenti();
+        sigla.value = sigla.value.toUpperCase();
+        const nomeValido = nome.value.trim().length >= 3;
+        const siglaValida = /^[A-Z0-9]{3}$/.test(sigla.value.trim());
+        nome.className = nomeValido ? "campo-verde" : "campo-rosso";
+        sigla.className = siglaValida ? "campo-verde" : "campo-rosso";
+        aggiungi.disabled = !(nomeValido && siglaValida && formMateria.querySelector('input[name="percorso"]:checked'));
+    }
+    nome.addEventListener("input", aggiornaAggiunta);
+    sigla.addEventListener("input", aggiornaAggiunta);
+    formMateria.querySelectorAll('input[name="percorso"]').forEach(campo => campo.addEventListener("change", aggiornaAggiunta));
+    const elimina = document.getElementById("elimina-materia");
+    const modifica = document.getElementById("modifica-materia");
+    document.querySelectorAll('input[name="materia"]').forEach(campo => campo.addEventListener("change", () => {
+        elimina.disabled = false;
+        modifica.disabled = false;
+        document.getElementById("form-elimina").action = `/admin/materie/${campo.value}/elimina`;
+        modifica.dataset.materia = campo.value;
+    }));
+    modifica.addEventListener("click", () => {
+        attendere.classList.remove("nascosto");
+        window.location.assign(`/admin/materie?materia=${modifica.dataset.materia}`);
+    });
+    document.getElementById("form-elimina").addEventListener("submit", evento => {
+        if (!confirm("Eliminare questa materia dal quadro attivo? I record ricevuti restano conservati.")) evento.preventDefault();
+        else attendere.classList.remove("nascosto");
+    });
+    formMateria.addEventListener("submit", () => attendere.classList.remove("nascosto"));
+    const materiaIniziale = document.querySelector('input[name="materia"]:checked');
+    if (materiaIniziale) {
+        elimina.disabled = false;
+        modifica.disabled = false;
+        document.getElementById("form-elimina").action = `/admin/materie/${materiaIniziale.value}/elimina`;
+        modifica.dataset.materia = materiaIniziale.value;
+    }
+    aggiornaAggiunta();
+</script>
+{% endblock %}

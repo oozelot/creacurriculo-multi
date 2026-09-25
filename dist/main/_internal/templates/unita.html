@@ -1,0 +1,1857 @@
+{% extends "base.html" %}
+
+{% block titolo %}U.D. {{ indice }} del modulo {{ numero }}{% endblock %}
+{% block intestazione %}UNITA' DIDATTICA N. {{ indice }} <span style="color: #ff3b30;">&mdash;</span> MODULO N. {{ numero }}{% endblock %}
+
+
+{% macro blocco_pecup(titolo, prefisso_testo, prefisso_codice, intervallo, testi, codici, elenco, limite) %}
+
+<fieldset class="lista-codificata">
+
+    <legend
+        class="lista-obbligatoria"
+        data-lista-obbligatoria="codificata"
+        style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span>{{ titolo }}</span>
+        <button type="button" class="bottone-compilazione-facilitata" data-target="{{ prefisso_codice }}" style="padding: 2px 8px; font-size: 12px; cursor: pointer;">Compilazione facilitata</button>
+    </legend>
+
+    {% set id_datalist = "elenco_" ~ prefisso_codice %}
+
+    <!-- Datalist visibile: SOLO i codici della materia corrente -->
+    <datalist id="{{ id_datalist }}">
+        {% for voce in elenco %}
+        <option
+            value="{{ voce.codice }}"
+            data-descrizione="{{ voce.descrizione or voce.testo or '' }}">
+        </option>
+        {% endfor %}
+    </datalist>
+
+
+    {% for i in intervallo %}
+    <div
+        class="griglia riga-codificata"
+        data-riga="{{ i }}"
+        style="grid-template-columns: 220px 1fr; margin-bottom:8px">
+
+        <div>
+            <input
+                type="text"
+                name="{{ prefisso_codice }}{{ i }}"
+                data-prefisso="{{ prefisso_codice }}"
+                class="codice-pecup campo-progressivo"
+                list="{{ id_datalist }}"
+                autocomplete="off"
+                value="{{ codici[i - 1] }}"
+                placeholder="— nessun codice —">
+        </div>
+
+        <div>
+            <textarea
+                name="{{ prefisso_testo }}{{ i }}"
+                class="testo-codificato campo-progressivo"
+                rows="2"
+                maxlength="{{ limite }}">{{ testi[i - 1] | pulito }}</textarea>
+        </div>
+
+    </div>
+    {% endfor %}
+
+    <p class="nota">
+        Scrivendo o scegliendo un codice il testo corrispondente viene compilato automaticamente se vuoto.
+    </p>
+
+</fieldset>
+
+{% endmacro %}
+
+
+{% block contenuto %}
+
+<form
+    method="post"
+    id="form-unita"
+    class="form-unita">
+
+
+    <!-- ========================================================= -->
+    <!-- DATI GENERALI DELL'UNITA' DIDATTICA -->
+    <!-- ========================================================= -->
+
+    <fieldset>
+
+        <legend>Dati dell'unita' didattica</legend>
+
+
+        <label for="titolo">
+            Titolo
+        </label>
+
+        <input
+            type="text"
+            id="titolo"
+            class="campo-progressivo"
+            name="titolo"
+            maxlength="{{ limiti.titolo_ud }}"
+            value="{{ ud.titolo | pulito }}"
+            required>
+
+
+        <label
+            for="argomenti"
+            style="margin-top:10px">
+
+            Argomenti trattati (una riga per argomento)
+
+        </label>
+
+        <textarea
+            id="argomenti"
+            class="campo-progressivo"
+            name="argomenti"
+            rows="6"
+            maxlength="{{ limiti.argomenti }}">{{ ud.argomenti | pulito }}</textarea>
+
+
+        <label
+            for="prerequisiti"
+            style="margin-top:10px">
+
+            Prerequisiti (una riga per prerequisito)
+
+        </label>
+
+        <textarea
+            id="prerequisiti"
+            class="campo-progressivo"
+            name="prerequisiti"
+            rows="4"
+            maxlength="{{ limiti.prerequisiti }}">{{ ud.prerequisiti | pulito }}</textarea>
+
+    </fieldset>
+
+
+    <!-- ========================================================= -->
+    <!-- QUADRO MULTIDISCIPLINARE -->
+    <!-- ========================================================= -->
+
+    <fieldset>
+
+        <legend
+            class="lista-obbligatoria"
+            data-lista-obbligatoria="quadro">
+
+            Quadro multidisciplinare
+
+        </legend>
+
+
+        {% for voce in multidisciplinare[:4] %}
+
+        <label class="scelta-inline">
+
+            <input
+                type="radio"
+                name="multidisciplinare"
+                value="{{ loop.index }}"
+                {{ 'checked' if loop.index in ud.multidisciplinare }}>
+
+            {{ voce }}
+
+        </label>
+
+        {% endfor %}
+
+        <label class="scelta-inline">
+
+            <input
+                type="checkbox"
+                name="multidisciplinare"
+                value="5"
+                {{ 'checked' if 5 in ud.multidisciplinare }}>
+
+            {{ multidisciplinare[4] }}
+
+        </label>
+
+
+        <div
+            id="altro-quadro"
+            style="margin-top:10px">
+
+            <label for="multidisciplinare_altro">
+                Quale altro quadro
+            </label>
+
+            <input
+                type="text"
+                id="multidisciplinare_altro"
+                class="campo-progressivo"
+                name="multidisciplinare_altro"
+                maxlength="{{ limiti.multidisciplinare_altro }}"
+                value="{{ ud.multidisciplinare_altro }}">
+
+        </div>
+
+    </fieldset>
+
+
+    <!-- ========================================================= -->
+    <!-- ABILITA' -->
+    <!-- ========================================================= -->
+
+    {{ blocco_pecup(
+        "Abilita'",
+        "abilita_",
+        "codice_abilita_",
+        intervallo_abilita,
+        ud.abilita,
+        ud.codici_abilita,
+        elenco_abilita,
+        limiti.abilita
+    ) }}
+
+
+    <!-- ========================================================= -->
+    <!-- CONOSCENZE -->
+    <!-- ========================================================= -->
+
+    {{ blocco_pecup(
+        "Conoscenze",
+        "conoscenza_",
+        "codice_conoscenza_",
+        intervallo_conoscenze,
+        ud.conoscenze,
+        ud.codici_conoscenze,
+        elenco_conoscenze,
+        limiti.conoscenza
+    ) }}
+
+
+    <!-- ========================================================= -->
+    <!-- COMPETENZE PECUP -->
+    <!-- ========================================================= -->
+
+    {{ blocco_pecup(
+        "Competenze PECUP",
+        "competenza_pecup_",
+        "codice_competenza_pecup_",
+        intervallo_competenze,
+        ud.competenze_pecup,
+        ud.codici_competenze_pecup,
+        elenco_competenze,
+        limiti.competenza_pecup
+    ) }}
+
+
+    <!-- ========================================================= -->
+    <!-- COMPETENZE IN CHIAVE EUROPEA -->
+    <!-- ========================================================= -->
+
+    <fieldset>
+
+        <legend class="lista-obbligatoria lista-check-obbligatoria">
+            Competenze in chiave europea
+        </legend>
+
+
+        <div class="scelte">
+
+            {% for voce in competenze_europee %}
+
+            <label>
+
+                <input
+                    type="checkbox"
+                    name="competenze_europee"
+                    value="{{ loop.index }}"
+                    {{ 'checked' if loop.index in ud.competenze_europee }}>
+
+                {{ voce }}
+
+            </label>
+
+            {% endfor %}
+
+        </div>
+
+    </fieldset>
+
+
+    <!-- ========================================================= -->
+    <!-- COMPETENZE DI CITTADINANZA -->
+    <!-- ========================================================= -->
+
+    <fieldset>
+
+        <legend class="lista-obbligatoria lista-check-obbligatoria">
+            Competenze di cittadinanza
+        </legend>
+
+
+        <div class="scelte">
+
+            {% for voce in competenze_cittadinanza %}
+
+            <label>
+
+                <input
+                    type="checkbox"
+                    name="competenze_cittadinanza"
+                    value="{{ loop.index }}"
+                    {{ 'checked' if loop.index in ud.competenze_cittadinanza }}>
+
+                {{ voce }}
+
+            </label>
+
+            {% endfor %}
+
+        </div>
+
+    </fieldset>
+
+
+    <!-- ========================================================= -->
+    <!-- LIVELLI DI COMPETENZA -->
+    <!-- ========================================================= -->
+
+    <fieldset>
+
+        <legend>
+            Livelli di competenza raggiunti
+        </legend>
+
+
+        <label for="competenze_minime">
+            Minime
+        </label>
+
+        <textarea
+            id="competenze_minime"
+            class="campo-progressivo"
+            name="competenze_minime"
+            rows="3"
+            maxlength="{{ limiti.competenze_livello }}">{{ ud.competenze_minime | pulito }}</textarea>
+
+
+        <label
+            for="competenze_intermedie"
+            style="margin-top:10px">
+
+            Intermedie
+
+            <span class="testo-ridotto">
+                (stesse competenze minime con l'aggiunta)
+            </span>
+
+        </label>
+
+        <textarea
+            id="competenze_intermedie"
+            class="campo-progressivo"
+            name="competenze_intermedie"
+            rows="3"
+            maxlength="{{ limiti.competenze_livello }}">{{ ud.competenze_intermedie | pulito }}</textarea>
+
+
+        <label
+            for="competenze_avanzate"
+            style="margin-top:10px">
+
+            Avanzate
+
+            <span class="testo-ridotto">
+                (stesse competenze avanzate con l'aggiunta)
+            </span>
+
+        </label>
+
+        <textarea
+            id="competenze_avanzate"
+            class="campo-progressivo"
+            name="competenze_avanzate"
+            rows="3"
+            maxlength="{{ limiti.competenze_livello }}">{{ ud.competenze_avanzate | pulito }}</textarea>
+
+    </fieldset>
+
+
+</form>
+
+
+<!-- ========================================================= -->
+    <!-- DATABASE GLOBALE PECUP (Caricato per validazione)         -->
+    <!-- ========================================================= -->
+
+{% set ns = namespace(diz={}) %}
+
+{% for voce in elenco_abilita_globale %}
+    {% set _ = ns.diz.update({
+        voce.codice: (voce.descrizione or voce.testo or '')
+    }) %}
+{% endfor %}
+
+{% for voce in elenco_conoscenze_globale %}
+    {% set _ = ns.diz.update({
+        voce.codice: (voce.descrizione or voce.testo or '')
+    }) %}
+{% endfor %}
+
+{% for voce in elenco_competenze_globale %}
+    {% set _ = ns.diz.update({
+        voce.codice: (voce.descrizione or voce.testo or '')
+    }) %}
+{% endfor %}
+
+<script type="application/json" id="db-pecup-globale">{{ ns.diz | tojson }}</script>
+<script type="application/json" id="db-pecup-liste">{{ {
+    "abilita": elenco_abilita_materie,
+    "conoscenza": elenco_conoscenze_materie,
+    "competenza": elenco_competenze_materie
+} | tojson }}</script>
+<script type="application/json" id="materie-filtro">{{ materie_filtro | tojson }}</script>
+<script type="application/json" id="sicurezza-biennio">{{ elenco_sicurezza_biennio | tojson }}</script>
+
+<style>
+    .modal-facilitata {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, .4);
+    }
+    .finestra-facilitata {
+        width: min(1180px, 96vw);
+        max-height: 92vh;
+        overflow: hidden;
+        padding: 18px 22px 16px;
+        background: #fff;
+        border: 2px solid #333;
+        font-weight: bold;
+    }
+    .finestra-facilitata input,
+    .finestra-facilitata button,
+    .finestra-facilitata .testo-facilitata,
+    .finestra-facilitata .cella-codice-selezionato {
+        font-weight: bold;
+    }
+    .titolo-facilitata {
+        margin: -18px -22px 16px;
+        padding: 10px;
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        background: #eee;
+        border-bottom: 2px solid #999;
+    }
+    .corpo-facilitata {
+        display: grid;
+        grid-template-columns: 205px minmax(0, 1fr) 140px;
+        gap: 12px;
+        align-items: stretch;
+        height: min(520px, 68vh);
+    }
+    .filtri-facilitata, .selezionati-facilitata { min-width: 0; overflow: hidden; }
+    .filtri-facilitata fieldset, .selezionati-facilitata fieldset { margin: 0 0 7px; padding: 5px 7px; }
+    .filtri-facilitata .scelte-facilitata { max-height: 145px; overflow-y: auto; overflow-x: hidden; }
+    .filtri-facilitata fieldset:nth-child(2) .scelte-facilitata { max-height: 105px; }
+    .filtri-facilitata fieldset:nth-child(3) .scelte-facilitata { max-height: 105px; }
+    .scelte-facilitata label { margin-bottom: 2px; font-size: 11px; font-weight: bold; line-height: 14px; }
+    .scelte-facilitata input { margin-right: 4px; }
+    .lista-facilitata { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .intestazione-lista-facilitata {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 8px;
+        font-weight: bold;
+        background: #eee;
+        border: 1px solid #999;
+    }
+    #conteggio-facilitata { font-size: 11px; font-weight: normal; }
+    .tabella-facilitata {
+        flex: 1 1 auto;
+        height: 100%;
+        min-height: 0;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        border: 1px solid #999;
+        border-top: 0;
+    }
+    .riga-facilitata {
+        display: grid;
+        grid-template-columns: 24px 105px minmax(0, 1fr);
+        gap: 5px;
+        align-items: start;
+        padding: 4px 6px;
+        border-bottom: 1px solid #ddd;
+        font-size: 11px;
+    }
+    .riga-facilitata:hover { background: #f4f4f4; }
+    .codice-facilitata { overflow-wrap: anywhere; font-weight: bold; }
+    .testo-facilitata {
+        max-height: 34px;
+        overflow: hidden;
+        line-height: 15px;
+        cursor: text;
+    }
+    .testo-facilitata:focus, .testo-facilitata:hover { max-height: 120px; overflow: auto; outline: 1px solid #999; background: #fff; }
+    .cella-codice-selezionato {
+        width: 100%;
+        min-height: 27px;
+        margin-bottom: 6px;
+        padding: 5px;
+        border: 1px solid #888;
+        background: #f8f8f8;
+        font-size: 11px;
+        font-weight: bold;
+    }
+    .comandi-facilitata { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+    .popup-warning-facilitata {
+        position: fixed;
+        inset: 0;
+        z-index: 100001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, .3);
+    }
+    .finestra-warning-facilitata {
+        min-width: 300px;
+        max-width: 520px;
+        padding: 18px 24px;
+        background: #fff;
+        border: 2px solid #a33;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, .25);
+        text-align: center;
+    }
+    .finestra-warning-facilitata button { margin-top: 16px; }
+    @media (max-width: 800px) {
+        .corpo-facilitata { grid-template-columns: 170px minmax(0, 1fr) 125px; }
+        .riga-facilitata { grid-template-columns: 22px 85px minmax(0, 1fr); }
+    }
+</style>
+
+
+<!-- ========================================================= -->
+    <!-- MODALE COMPILAZIONE FACILITATA                          -->
+    <!-- ========================================================= -->
+<div id="modal-compilazione-facilitata" class="modal-facilitata">
+    <div class="finestra-facilitata">
+        <div class="titolo-facilitata" id="titolo-facilitata">Compilazione facilitata</div>
+
+        <div class="corpo-facilitata">
+            <aside class="filtri-facilitata">
+                <fieldset>
+                    <legend>Materia</legend>
+                    <div id="filtro-materia" class="scelte-facilitata"></div>
+                </fieldset>
+                <fieldset>
+                    <legend>Indirizzo</legend>
+                    <div class="scelte-facilitata">
+                        <label><input type="checkbox" data-filtro="indirizzo" value=""> Tutti</label>
+                        <label><input type="checkbox" data-filtro="indirizzo" value="2"> Grafico</label>
+                        <label><input type="checkbox" data-filtro="indirizzo" value="3"> CAT</label>
+                        <label><input type="checkbox" data-filtro="indirizzo" value="4"> Agrario</label>
+                        <label><input type="checkbox" data-filtro="indirizzo" value="5"> Agrario PT</label>
+                        <label><input type="checkbox" data-filtro="indirizzo" value="6"> Agrario ENO</label>
+                        <label><input type="checkbox" data-filtro="indirizzo" value="7"> Agrario GAT</label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Classe</legend>
+                    <div class="scelte-facilitata">
+                        <label><input type="checkbox" data-filtro="classe" value="BIE"> Biennio</label>
+                        <label><input type="checkbox" data-filtro="classe" value="345"> Secondo biennio e quinta</label>
+                        <label><input type="checkbox" data-filtro="classe" value="34-"> Secondo biennio senza quinta</label>
+                        <label><input type="checkbox" data-filtro="classe" value="005"> Classe quinta</label>
+                    </div>
+                </fieldset>
+            </aside>
+
+            <section class="lista-facilitata">
+                <div class="intestazione-lista-facilitata">
+                    <span>Materia / classe e contenuti</span>
+                    <span id="conteggio-facilitata"></span>
+                </div>
+                <div class="tabella-facilitata" id="tabella-facilitata"></div>
+            </section>
+
+            <aside class="selezionati-facilitata">
+                <fieldset>
+                    <legend>Codici selezionati</legend>
+                    <div id="codici-selezionati-facilitata"></div>
+                </fieldset>
+            </aside>
+        </div>
+
+        <p id="avviso-facilitata" class="avviso-form" style="display:none;"></p>
+        <div class="comandi-facilitata">
+            <button type="button" id="chiudi-modal-facilitata" class="bottone">Chiudi</button>
+            <button type="button" id="aggiungi-modal-facilitata" class="bottone principale" disabled>Aggiungi</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+
+    /* ========================================================= */
+    /* RIFERIMENTI AI CAMPI PRINCIPALI                           */
+    /* ========================================================= */
+
+    const formUnita =
+        document.getElementById("form-unita");
+
+
+    const titoloUnita =
+        document.getElementById("titolo");
+
+
+    const quadroAltro =
+        document.getElementById(
+            "multidisciplinare_altro"
+        );
+
+
+    const salvaUnita =
+        document.getElementById("salva-unita");
+
+
+    const almenoTre =
+        valore =>
+            valore.trim().length >= 3;
+
+
+    /* ========================================================= */
+    /* GESTIONE MODALE COMPILAZIONE FACILITATA                   */
+    /* ========================================================= */
+
+    const modalFacilitata = document.getElementById("modal-compilazione-facilitata");
+    const btnChiudiModal = document.getElementById("chiudi-modal-facilitata");
+    const btnAggiungiModal = document.getElementById("aggiungi-modal-facilitata");
+    const tabellaFacilitata = document.getElementById("tabella-facilitata");
+    const codiciSelezionatiFacilitata = document.getElementById("codici-selezionati-facilitata");
+    const avvisoFacilitata = document.getElementById("avviso-facilitata");
+    const dbPecupListe = JSON.parse(document.getElementById("db-pecup-liste").textContent);
+    const materieFiltro = JSON.parse(document.getElementById("materie-filtro").textContent);
+    const sicurezzaBiennio = JSON.parse(document.getElementById("sicurezza-biennio").textContent);
+    let tipoFacilitata = "abilita";
+    let prefissoFacilitata = "codice_abilita_";
+    let selezioniFacilitata = [];
+
+    function codicePulito(codice) {
+        return String(codice || "").trim().toUpperCase();
+    }
+
+    function chiaveMateria(nome) {
+        return String(nome || "")
+            .toUpperCase()
+            .split("(")[0]
+            .replace(/[^A-Z0-9]/g, "");
+    }
+
+    function limiteFacilitata() {
+        return tipoFacilitata === "competenza" ? 5 : 9;
+    }
+
+    function valoriFiltro(nome) {
+        return [...document.querySelectorAll(`[data-filtro="${nome}"]:checked`)]
+            .map(campo => codicePulito(campo.value))
+            .filter(Boolean);
+    }
+
+    function voceVisibile(voce) {
+        const materie = valoriFiltro("materia");
+        const indirizzi = valoriFiltro("indirizzo");
+        const classi = valoriFiltro("classe");
+        const materieVoce = (voce.materie || []).map(chiaveMateria);
+        const sicurezzaSelezionata = materie.includes("__SICUREZZA_BIENNIO__");
+        const voceSicurezza = sicurezzaSelezionata
+            && (sicurezzaBiennio[tipoFacilitata] || []).some(sicurezza => sicurezza.codice === voce.codice);
+        const materiaSelezionata = materie
+            .filter(materia => materia !== "__SICUREZZA_BIENNIO__")
+            .some(materia => materieVoce.includes(materia));
+        const classiVoce = (voce.classi || []).map(String);
+        const classiSelezionate = classi.flatMap(classe => {
+            if (classe === "BIE") return ["1", "2"];
+            if (classe === "345") return ["3", "4", "5"];
+            if (classe === "34-") return ["3", "4"];
+            if (classe === "005") return ["5"];
+            return [];
+        });
+        const articolazioniVoce = voce.articolazione ? [voce.articolazione] : [];
+        const articolazioniSelezionate = indirizzi.map(indirizzo => ({
+            "1": "T",
+            "2": "G",
+            "3": "C",
+            "4": "A",
+            "5": "p",
+            "6": "e",
+            "7": "g"
+        }[indirizzo])).filter(Boolean);
+        return (!materie.length || voceSicurezza || materiaSelezionata)
+            && (!indirizzi.length || articolazioniSelezionate.some(indirizzo => articolazioniVoce.includes(indirizzo)))
+            && (!classi.length || classiSelezionate.some(classe => classiVoce.includes(classe)));
+    }
+
+    function etichettaClasse(classi) {
+        const valori = [...new Set((classi || []).map(String))].sort();
+        if (valori.join(",") === "1,2") return "BIE";
+        if (valori.join(",") === "3,4") return "34-";
+        if (valori.join(",") === "3,4,5") return "345";
+        if (valori.join(",") === "5") return "005";
+        return valori.join("/") || "-";
+    }
+
+    function etichettaArticolazione(articolazione) {
+        return {
+            "T": "COM",
+            "G": "GRA",
+            "C": "CAT",
+            "A": "AGR",
+            "p": "PT",
+            "e": "ENO",
+            "g": "GAT"
+        }[articolazione] || "";
+    }
+
+    function etichettaMateria(voce) {
+        const materie = voce.materie || [];
+        if (materie.length) {
+            return materie.join(" / ");
+        }
+        return "Sicurezza";
+    }
+
+    function mostraAvviso(testo) {
+        avvisoFacilitata.textContent = testo;
+        avvisoFacilitata.style.display = testo ? "block" : "none";
+    }
+
+    function mostraWarning(testo) {
+        const popup = document.createElement("div");
+        popup.className = "popup-warning-facilitata";
+        const finestra = document.createElement("div");
+        finestra.className = "finestra-warning-facilitata";
+        const messaggio = document.createElement("div");
+        messaggio.textContent = testo;
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.textContent = "OK";
+        ok.className = "bottone principale";
+        ok.addEventListener("click", () => popup.remove());
+        finestra.append(messaggio, ok);
+        popup.appendChild(finestra);
+        document.body.appendChild(popup);
+        ok.focus();
+    }
+
+    function aggiornaSelezionati() {
+        codiciSelezionatiFacilitata.innerHTML = "";
+        for (let indice = 0; indice < limiteFacilitata(); indice += 1) {
+            const cella = document.createElement("div");
+            cella.className = "cella-codice-selezionato";
+            cella.textContent = selezioniFacilitata[indice] || "";
+            codiciSelezionatiFacilitata.appendChild(cella);
+        }
+        btnAggiungiModal.disabled = selezioniFacilitata.length === 0;
+    }
+
+    function aggiornaListaFacilitata() {
+        const voci = (dbPecupListe[tipoFacilitata] || []).filter(voce => voceVisibile(voce));
+        tabellaFacilitata.innerHTML = "";
+        document.getElementById("conteggio-facilitata").textContent = `${voci.length} voci`;
+        voci.forEach(voce => {
+            const riga = document.createElement("div");
+            riga.className = "riga-facilitata";
+            const check = document.createElement("input");
+            check.type = "checkbox";
+            check.checked = selezioniFacilitata.includes(voce.codice);
+            check.dataset.codice = voce.codice;
+            check.addEventListener("change", () => {
+                if (check.checked) {
+                    if (selezioniFacilitata.length >= limiteFacilitata()) {
+                        check.checked = false;
+                        mostraWarning(`Hai selezionato più voci di quante disponibili (${limiteFacilitata()}). Elimina dei check.`);
+                        return;
+                    }
+                    selezioniFacilitata.push(voce.codice);
+                    mostraAvviso("");
+                } else {
+                    selezioniFacilitata = selezioniFacilitata.filter(codice => codice !== voce.codice);
+                }
+                aggiornaSelezionati();
+            });
+            const riferimento = document.createElement("div");
+            riferimento.className = "codice-facilitata";
+            const articolazione = etichettaArticolazione(voce.articolazione);
+            riferimento.textContent = `${etichettaMateria(voce)} · ${etichettaClasse(voce.classi)}${articolazione ? ` · ${articolazione}` : ""}`;
+            riferimento.title = `${voce.codice} - ${riferimento.textContent}`;
+            const testo = document.createElement("div");
+            testo.className = "testo-facilitata";
+            testo.tabIndex = 0;
+            testo.textContent = voce.descrizione || voce.testo || "";
+            testo.title = testo.textContent;
+            riga.append(check, riferimento, testo);
+            tabellaFacilitata.appendChild(riga);
+        });
+    }
+
+    function preparaMaterieFiltro() {
+        const contenitore = document.getElementById("filtro-materia");
+        contenitore.innerHTML = "";
+        const sicurezzaLabel = document.createElement("label");
+        const sicurezzaCheck = document.createElement("input");
+        sicurezzaCheck.type = "checkbox";
+        sicurezzaCheck.dataset.filtro = "materia";
+        sicurezzaCheck.value = "__SICUREZZA_BIENNIO__";
+        sicurezzaCheck.addEventListener("change", aggiornaListaFacilitata);
+        sicurezzaLabel.append(sicurezzaCheck, " Sicurezza biennio");
+        contenitore.appendChild(sicurezzaLabel);
+        materieFiltro.forEach(materia => {
+            const label = document.createElement("label");
+            const check = document.createElement("input");
+            check.type = "checkbox";
+            check.dataset.filtro = "materia";
+            check.value = chiaveMateria(materia.nome);
+            check.addEventListener("change", aggiornaListaFacilitata);
+            label.append(check, ` ${materia.nome}`);
+            contenitore.appendChild(label);
+        });
+    }
+
+    function apriCompilazioneFacilitata(pulsante) {
+        prefissoFacilitata = pulsante.dataset.target;
+        tipoFacilitata = prefissoFacilitata === "codice_conoscenza_"
+            ? "conoscenza"
+            : prefissoFacilitata === "codice_competenza_pecup_" ? "competenza" : "abilita";
+        selezioniFacilitata = [];
+        document.getElementById("titolo-facilitata").textContent = `Compilazione facilitata - ${tipoFacilitata === "abilita" ? "Abilita'" : tipoFacilitata === "conoscenza" ? "Conoscenze" : "Competenze PECUP"}`;
+        document.querySelectorAll("#modal-compilazione-facilitata input[type=checkbox]").forEach(check => { check.checked = false; });
+        preparaMaterieFiltro();
+        aggiornaSelezionati();
+        aggiornaListaFacilitata();
+        modalFacilitata.style.display = "flex";
+    }
+
+    document.querySelectorAll(".bottone-compilazione-facilitata").forEach(btn => {
+        btn.addEventListener("click", () => apriCompilazioneFacilitata(btn));
+    });
+    document.querySelectorAll("#modal-compilazione-facilitata input[data-filtro]").forEach(check => {
+        check.addEventListener("change", () => {
+            if (check.dataset.filtro === "indirizzo" && check.value === "" && check.checked) {
+                document.querySelectorAll("[data-filtro=indirizzo]").forEach(campo => { campo.checked = campo === check; });
+            } else if (check.dataset.filtro === "indirizzo" && check.value !== "" && check.checked) {
+                document.querySelector("[data-filtro=indirizzo][value='']").checked = false;
+            }
+            aggiornaListaFacilitata();
+        });
+    });
+    btnChiudiModal.addEventListener("click", () => { modalFacilitata.style.display = "none"; });
+    window.addEventListener("click", e => { if (e.target === modalFacilitata) modalFacilitata.style.display = "none"; });
+    btnAggiungiModal.addEventListener("click", () => {
+        document.querySelectorAll(`input[data-prefisso="${prefissoFacilitata}"]`).forEach((campo, indice) => {
+            campo.value = selezioniFacilitata[indice] || "";
+            campo.dispatchEvent(new Event("input", { bubbles: true }));
+            if (selezioniFacilitata[indice]) campo.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        modalFacilitata.style.display = "none";
+    });
+
+
+    /* ========================================================= */
+    /* DATABASE GLOBALE PECUP                                   */
+    /* ========================================================= */
+
+    const elementoDbGlobale =
+        document.getElementById("db-pecup-globale");
+
+
+    const dbGlobale =
+        elementoDbGlobale
+            ? JSON.parse(elementoDbGlobale.textContent)
+            : {};
+
+
+    
+
+    /* ========================================================= */
+    /* NORMALIZZAZIONE CODICI                                   */
+    /* ========================================================= */
+
+    function normalizzaCodice(codice) {
+
+        return String(codice || "")
+            .trim()
+            .replace(/\s/g, "")
+            .replace(/^([a-z0-9]{3})/, gruppo => gruppo.toUpperCase())
+            .replace(/(bie|ct|ab|cs)/g, gruppo => gruppo.toUpperCase());
+
+    }
+
+
+    function strutturaCodiceValida(codice) {
+
+        return /^[A-Z0-9]{3}[TACGpeg](BIE|345|34-)(AB|CS|CT)P\d{2}$/.test(codice);
+
+    }
+
+
+    /* ========================================================= */
+    /* INDIVIDUAZIONE CATEGORIA                                 */
+    /* ========================================================= */
+
+    function siglaAttesa(campoCodice) {
+
+        const prefisso =
+            campoCodice.dataset.prefisso || "";
+
+
+        if (prefisso === "codice_abilita_") {
+            return "AB";
+        }
+
+
+        if (prefisso === "codice_conoscenza_") {
+            return "CS";
+        }
+
+
+        if (prefisso === "codice_competenza_pecup_") {
+            return "CT";
+        }
+
+
+        return "";
+
+    }
+
+
+    function codiceAppartieneAllaCategoria(
+        codice,
+        sigla
+    ) {
+
+        if (!sigla) {
+            return false;
+        }
+
+
+        const codiceNorm =
+            normalizzaCodice(codice);
+
+
+        return strutturaCodiceValida(codiceNorm)
+            && codiceNorm.slice(7, 9) === sigla;
+
+    }
+
+
+    /* ========================================================= */
+    /* COLORAZIONE CAMPI                                        */
+    /* ========================================================= */
+
+    function colora(
+        campo,
+        valido,
+        attivo = true
+    ) {
+
+        campo.classList.remove(
+            "campo-rosso",
+            "campo-verde",
+            "campo-giallo"
+        );
+
+
+        campo.classList.remove(
+            "ud-rosso",
+            "ud-verde"
+        );
+
+
+        campo.style.removeProperty(
+            "background-color"
+        );
+
+
+        if (attivo) {
+
+            campo.classList.add(
+                valido
+                    ? "campo-verde"
+                    : "campo-rosso"
+            );
+
+
+            campo.classList.add(
+                valido
+                    ? "ud-verde"
+                    : "ud-rosso"
+            );
+
+
+            campo.style.setProperty(
+                "background-color",
+                valido
+                    ? "#b9f6a5"
+                    : "#ff3b30",
+                "important"
+            );
+
+        }
+
+    }
+
+
+    /* ========================================================= */
+    /* AGGIORNAMENTO LISTE CHECKBOX E QUADRO                     */
+    /* ========================================================= */
+
+    function aggiornaListe() {
+
+        document
+            .querySelectorAll(
+                ".lista-check-obbligatoria"
+            )
+            .forEach(legend => {
+
+                const gruppo =
+                    legend.closest("fieldset");
+
+
+                const ok =
+                    gruppo.querySelectorAll(
+                        'input[type="checkbox"]:checked'
+                    ).length > 0;
+
+
+                legend.classList.toggle(
+                    "completa",
+                    ok
+                );
+
+
+                legend.classList.toggle(
+                    "incompleta",
+                    !ok
+                );
+
+            });
+
+
+        const quadro =
+            document.querySelector(
+                'input[name="multidisciplinare"]:checked'
+            );
+
+
+        const quadroOk =
+            Boolean(quadro);
+
+
+        const legendQuadro =
+            document.querySelector(
+                '[data-lista-obbligatoria="quadro"]'
+            );
+
+
+        legendQuadro.classList.toggle(
+            "completa",
+            quadroOk
+        );
+
+
+        legendQuadro.classList.toggle(
+            "incompleta",
+            !quadroOk
+        );
+
+
+        const altroAttivo =
+            quadro?.value === "4";
+
+
+        quadroAltro.disabled =
+            !altroAttivo;
+
+
+        quadroAltro.classList.remove(
+            "campo-rosso",
+            "campo-verde"
+        );
+
+
+        if (altroAttivo) {
+
+            quadroAltro.classList.add(
+                almenoTre(
+                    quadroAltro.value
+                )
+                    ? "campo-verde"
+                    : "campo-rosso"
+            );
+
+        }
+
+    }
+
+
+    /* ========================================================= */
+    /* AGGIORNAMENTO CODICI PECUP                               */
+    /* ========================================================= */
+
+    function aggiornaCodici() {
+
+        document
+            .querySelectorAll(
+                ".lista-codificata"
+            )
+            .forEach(lista => {
+
+                const righe = [
+                    ...lista.querySelectorAll(
+                        ".riga-codificata"
+                    )
+                ];
+
+
+                const legend =
+                    lista.querySelector(
+                        ".lista-obbligatoria"
+                    );
+
+
+                const primoCodice =
+                    righe[0].querySelector(
+                        ".codice-pecup"
+                    );
+
+
+                const primoTesto =
+                    righe[0].querySelector(
+                        ".testo-codificato"
+                    );
+
+
+                const ok =
+                    Boolean(
+                        primoCodice.value.trim()
+                    )
+                    &&
+                    almenoTre(
+                        primoTesto.value
+                    );
+
+
+                legend.classList.toggle(
+                    "completa",
+                    ok
+                );
+
+
+                legend.classList.toggle(
+                    "incompleta",
+                    !ok
+                );
+
+
+                righe.forEach(
+                    (riga, indice) => {
+
+                        const codice =
+                            riga.querySelector(
+                                ".codice-pecup"
+                            );
+
+
+                        const testo =
+                            riga.querySelector(
+                                ".testo-codificato"
+                            );
+
+
+                        // Visibilità progressiva:
+                        // Le prime 2 righe (indice 0 e 1) sono sempre visibili.
+                        // Le successive (indice >= 2) appaiono se la riga a due passi prima (indice - 2) è compilata.
+                        const visibile =
+                            indice < 2
+                            ||
+                            (
+                                righe[indice - 2]
+                                    .querySelector(
+                                        ".codice-pecup"
+                                    )
+                                    .value.trim()
+                                &&
+                                almenoTre(
+                                    righe[indice - 2]
+                                        .querySelector(
+                                            ".testo-codificato"
+                                        )
+                                        .value
+                                )
+                            );
+
+
+                        if (!visibile) {
+                            riga.style.display = "none";
+                            if (codice.value || testo.value) {
+                                codice.value = "";
+                                testo.value = "";
+                            }
+                            return;
+                        } else {
+                            riga.style.display = "";
+                        }
+
+
+                        testo.disabled =
+                            !codice.value.trim();
+
+
+                        testo.classList.toggle(
+                            "campo-disabilitato",
+                            testo.disabled
+                        );
+
+
+                        codice.classList.remove(
+                            "campo-rosso",
+                            "campo-verde",
+                            "campo-giallo"
+                        );
+
+
+                        testo.classList.remove(
+                            "campo-rosso",
+                            "campo-verde",
+                            "campo-giallo"
+                        );
+
+
+                        if (!codice.value.trim()) {
+
+                            const classe =
+                                indice === 0
+                                    ? "campo-rosso"
+                                    : "campo-giallo";
+
+
+                            codice.classList.add(
+                                classe
+                            );
+
+
+                            testo.classList.add(
+                                classe
+                            );
+
+
+                            return;
+
+                        }
+
+
+                        const completo =
+                            almenoTre(
+                                testo.value
+                            );
+
+
+                        const classe =
+                            completo
+                                ? "campo-verde"
+                                : "campo-rosso";
+
+
+                        codice.classList.add(
+                            classe
+                        );
+
+
+                        testo.classList.add(
+                            classe
+                        );
+
+                    }
+                );
+
+            });
+
+    }
+
+
+    /* ========================================================= */
+    /* AGGIORNAMENTO GENERALE DELL'UNITA'                       */
+    /* ========================================================= */
+
+    function aggiornaUnita() {
+
+        colora(
+            titoloUnita,
+            almenoTre(
+                titoloUnita.value
+            )
+        );
+
+
+        [
+            "argomenti",
+            "prerequisiti",
+            "competenze_minime",
+            "competenze_intermedie",
+            "competenze_avanzate"
+        ]
+        .forEach(id => {
+
+            const campo =
+                document.getElementById(id);
+
+
+            colora(
+                campo,
+                Boolean(
+                    campo.value.trim()
+                )
+            );
+
+        });
+
+
+        aggiornaListe();
+
+        aggiornaCodici();
+
+
+        const listeOk =
+            [
+                ...document.querySelectorAll(
+                    ".lista-obbligatoria.incompleta"
+                )
+            ].length === 0;
+
+
+        const codiciOk =
+            [
+                ...document.querySelectorAll(
+                    ".riga-codificata"
+                )
+            ]
+            .filter(riga => riga.style.display !== "none")
+            .every(riga => {
+
+                const codice =
+                    riga.querySelector(
+                        ".codice-pecup"
+                    );
+
+
+                const testo =
+                    riga.querySelector(
+                        ".testo-codificato"
+                    );
+
+
+                return (
+                    !codice.value
+                    ||
+                    almenoTre(
+                        testo.value
+                    )
+                );
+
+            });
+
+
+        const primoCodiceOk =
+            [
+                ...document.querySelectorAll(
+                    ".lista-codificata"
+                )
+            ]
+            .every(lista => {
+
+                return almenoTre(
+                    lista.querySelector(
+                        ".testo-codificato"
+                    ).value
+                );
+
+            });
+
+
+        if (salvaUnita) {
+
+            salvaUnita.disabled =
+                !almenoTre(
+                    titoloUnita.value
+                )
+                ||
+                !document.getElementById(
+                    "argomenti"
+                ).value.trim()
+                ||
+                !document.getElementById(
+                    "prerequisiti"
+                ).value.trim()
+                ||
+                !document.getElementById(
+                    "competenze_minime"
+                ).value.trim()
+                ||
+                !listeOk
+                ||
+                !codiciOk
+                ||
+                !primoCodiceOk;
+
+        }
+
+    }
+
+
+    /* ========================================================= */
+    /* EVENTI GENERALI                                          */
+    /* ========================================================= */
+
+    formUnita
+        .querySelectorAll(
+            "input, textarea"
+        )
+        .forEach(campo => {
+
+
+            campo.addEventListener(
+                "input",
+                aggiornaUnita
+            );
+
+
+            campo.addEventListener(
+                "change",
+                aggiornaUnita
+            );
+
+
+            if (
+                campo.classList.contains(
+                    "testo-codificato"
+                )
+            ) {
+
+                campo.addEventListener(
+                    "input",
+                    () => {
+
+                        if (
+                            !campo.value.trim()
+                        ) {
+
+                            campo
+                                .closest(
+                                    ".riga-codificata"
+                                )
+                                .querySelector(
+                                    ".codice-pecup"
+                                )
+                                .value = "";
+
+
+                            aggiornaUnita();
+
+                        }
+
+                    }
+                );
+
+            }
+
+        });
+
+
+    /* ========================================================= */
+    /* VERIFICA E AUTOCOMPILAZIONE CODICE PECUP                */
+    /* ========================================================= */
+
+    function gestisciCodicePecup(
+        campoCodice,
+        mostraErrore = false
+    ) {
+
+        const riga =
+            campoCodice.closest(
+                ".riga-codificata"
+            );
+
+
+        const testo =
+            riga.querySelector(
+                ".testo-codificato"
+            );
+
+
+        const codiceInserito =
+            campoCodice.value.trim();
+
+
+        if (!codiceInserito) {
+
+            const lista =
+                campoCodice.closest(
+                    ".lista-codificata"
+                );
+
+
+            const righe = [
+                ...lista.querySelectorAll(
+                    ".riga-codificata"
+                )
+            ];
+
+
+            const indice =
+                righe.indexOf(
+                    riga
+                );
+
+
+            for (
+                const rigaSuccessiva
+                of righe.slice(indice)
+            ) {
+
+                rigaSuccessiva
+                    .querySelector(
+                        ".codice-pecup"
+                    )
+                    .value = "";
+
+
+                rigaSuccessiva
+                    .querySelector(
+                        ".testo-codificato"
+                    )
+                    .value = "";
+
+            }
+
+
+            aggiornaUnita();
+
+            return;
+
+        }
+
+
+        const codiceNorm =
+            normalizzaCodice(
+                codiceInserito
+            );
+
+
+        if (!codiceNorm) {
+
+            aggiornaUnita();
+
+            return;
+
+        }
+
+
+        const sigla =
+            siglaAttesa(
+                campoCodice
+            );
+
+        let codiceTrovato =
+            null;
+
+
+        let descrizioneTrovata =
+            "";
+
+
+        for (
+            const [
+                codice,
+                descrizione
+            ]
+            of Object.entries(dbGlobale)
+        ) {
+
+            if (
+                normalizzaCodice(codice)
+                ===
+                codiceNorm
+            ) {
+
+                codiceTrovato =
+                    codice;
+
+
+                descrizioneTrovata =
+                    descrizione || "";
+
+
+                break;
+
+            }
+
+        }
+
+
+        if (!codiceTrovato) {
+            if (mostraErrore) {
+                mostraPopupCodiceInesistente(campoCodice, testo);
+            }
+            aggiornaUnita();
+            return;
+        }
+
+
+        if (!codiceAppartieneAllaCategoria(codiceTrovato, sigla)) {
+            if (mostraErrore) {
+                mostraPopupCodiceInesistente(campoCodice, testo);
+            }
+            aggiornaUnita();
+            return;
+        }
+
+
+        if (codiceTrovato) {
+
+            if (
+                !testo.value.trim()
+                &&
+                descrizioneTrovata
+            ) {
+
+                testo.value =
+                    descrizioneTrovata;
+
+            }
+
+
+            aggiornaUnita();
+
+            return;
+
+        }
+
+
+        if (mostraErrore) {
+
+            mostraPopupCodiceInesistente(
+                campoCodice,
+                testo
+            );
+
+        }
+
+
+        aggiornaUnita();
+
+    }
+
+
+    /* ========================================================= */
+    /* POPUP CODICE INESISTENTE                                */
+    /* ========================================================= */
+
+    function mostraPopupCodiceInesistente(
+        campoCodice,
+        testo
+    ) {
+
+        const vecchioPopup =
+            document.getElementById(
+                "popup-codice-inesistente"
+            );
+
+
+        if (vecchioPopup) {
+            vecchioPopup.remove();
+        }
+
+
+        const popup =
+            document.createElement(
+                "div"
+            );
+
+
+        popup.id =
+            "popup-codice-inesistente";
+
+
+        popup.style.cssText = `
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.25);
+        `;
+
+
+        const finestra =
+            document.createElement(
+                "div"
+            );
+
+
+        finestra.style.cssText = `
+            background: white;
+            border: 1px solid #777;
+            border-radius: 6px;
+            padding: 22px 28px;
+            min-width: 260px;
+            text-align: center;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+            font-size: 16px;
+        `;
+
+
+        const messaggio =
+            document.createElement(
+                "div"
+            );
+
+
+        messaggio.textContent =
+            "Codice inesistente";
+
+
+        messaggio.style.marginBottom =
+            "18px";
+
+
+        const pulsante =
+            document.createElement(
+                "button"
+            );
+
+
+        pulsante.type =
+            "button";
+
+
+        pulsante.textContent =
+            "OK";
+
+
+        pulsante.addEventListener(
+            "click",
+            () => {
+
+                campoCodice.value = "";
+
+                testo.value = "";
+
+                popup.remove();
+
+                aggiornaUnita();
+
+            }
+        );
+
+
+        finestra.appendChild(
+            messaggio
+        );
+
+
+        finestra.appendChild(
+            pulsante
+        );
+
+
+        popup.appendChild(
+            finestra
+        );
+
+
+        document.body.appendChild(
+            popup
+        );
+
+
+        pulsante.focus();
+
+    }
+
+
+    /* ========================================================= */
+    /* COLLEGAMENTO EVENTI AI CODICI PECUP                     */
+    /* ========================================================= */
+
+document
+        .querySelectorAll(
+            "input.codice-pecup"
+        )
+        .forEach(campoCodice => {
+
+
+            campoCodice.addEventListener(
+                "input",
+                () => {
+                    gestisciCodicePecup(
+                        campoCodice,
+                        false
+                    );
+                }
+            );
+
+
+            campoCodice.addEventListener(
+                "change",
+                () => {
+                    setTimeout(() => {
+                        gestisciCodicePecup(
+                            campoCodice,
+                            true
+                        );
+                        aggiornaUnita();
+                    }, 50);
+                }
+            );
+
+            campoCodice.addEventListener(
+                "paste",
+                () => {
+
+                    setTimeout(
+                        () => {
+
+                            gestisciCodicePecup(
+                                campoCodice,
+                                true
+                            );
+
+                        },
+                        0
+                    );
+
+                }
+            );
+
+        });
+
+
+    /* ========================================================= */
+    /* STATO INIZIALE                                           */
+    /* ========================================================= */
+
+    aggiornaUnita();
+
+</script>
+
+{% endblock %}

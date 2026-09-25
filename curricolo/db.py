@@ -217,6 +217,7 @@ def inizializza_database() -> None:
             raise RuntimeError("Impossibile ricostruire il catalogo di base.")
     from . import educazione_civica
     educazione_civica.sincronizza_catalogo_file()
+    _inizializza_educazione_civica_factory()
     inizializza_backup_stato()
 
 
@@ -238,6 +239,15 @@ def inizializza_backup_stato() -> None:
     for riga in contesti:
         if (riga["corso"], riga["classe"]) not in backup_civica:
             backup_educazione_civica(riga["corso"], riga["classe"])
+
+
+def _inizializza_educazione_civica_factory() -> None:
+    """Importa i piani base quando il database operativo e' ancora vuoto."""
+    with connessione() as conn:
+        piani_presenti = conn.execute("SELECT 1 FROM educazione_civica_piani LIMIT 1").fetchone()
+        backup_presente = conn.execute("SELECT 1 FROM educazione_civica_backup LIMIT 1").fetchone()
+    if piani_presenti is None and backup_presente is None:
+        _ripristina_educazione_civica_da_factory()
 
 
 def resetta_database() -> None:

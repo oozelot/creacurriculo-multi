@@ -1,0 +1,151 @@
+{% extends "admin_base.html" %}
+
+{% block contenuto %}
+<fieldset>
+    <legend>Gestione codici PECUP: {{ materia.nome }}</legend>
+    <p class="nota">Completare una classe alla volta. La classe proposta e' la prima che non ha ancora tutti i codici PECUP.</p>
+
+    <form method="get" class="scelta-fonti">
+        <fieldset>
+            <legend>1. Scegli classe, materie e anni sorgente</legend>
+            <label for="classe">Classe da completare</label>
+            <select id="classe" name="classe">
+                {% for voce in classi_mancanti %}<option value="{{ voce }}" {{ 'selected' if voce == classe }}>{{ voce }}</option>{% endfor %}
+            </select>
+            <div class="fonti-colonne">
+                <div><strong>Materie configurate da cui acquisire i testi</strong>
+                    <div class="lista-fonti">{% for fonte in materie_fonti %}
+                        <label><input type="checkbox" name="fonte" value="{{ fonte.id }}" {{ 'checked' if fonte.id in fonti }}> {{ fonte.nome }}</label>
+                    {% endfor %}</div>
+                </div>
+                <div><strong>Anni scolastici dei testi sorgente</strong>
+                    <div class="anni">{% for anno in ['PRIMA', 'SECONDA', 'TERZA', 'QUARTA', 'QUINTA'] %}
+                        <label><input type="checkbox" name="anno" value="{{ anno }}" {{ 'checked' if anno in anni or (not anni and anno == classe) }}> {{ anno }}</label>
+                    {% endfor %}</div>
+                </div>
+            </div>
+            <div class="barra barra-azioni">
+                <button type="submit" id="carica-testi" disabled>Carica testi</button>
+                <a class="bottone" href="{{ url_for('admin_materie') }}" data-attesa>Annulla</a>
+                {% if fonti and anni and (abilita or conoscenze or competenze) %}
+                <button type="submit" id="salva-pecup" form="form-pecup" hidden disabled>Salva codici PECUP per {{ classe }}</button>
+                {% endif %}
+            </div>
+        </fieldset>
+    </form>
+
+    {% if fonti and anni %}
+    <form method="post" id="form-pecup">
+        <input type="hidden" name="classe" value="{{ classe }}">
+        {% for fonte in fonti %}<input type="hidden" name="fonte" value="{{ fonte }}">{% endfor %}
+        {% for anno in anni %}<input type="hidden" name="anno" value="{{ anno }}">{% endfor %}
+        <fieldset><legend>2. Seleziona i testi per {{ classe }}</legend>
+            <div class="pecup-griglie">
+                {% for titolo, nome, voci in [("Abilita'", "abilita", abilita), ("Conoscenze", "conoscenza", conoscenze), ("Competenze", "competenza", competenze)] %}
+                <fieldset><legend>{{ titolo }}</legend>
+                    <button type="button" class="seleziona-tutto" data-tipo="{{ nome }}">Seleziona tutto</button>
+                    <div class="lista-pecup">{% for voce in voci %}
+                        <label><input type="checkbox" name="{{ nome }}" value="{{ voce }}"> {{ voce }}</label>
+                    {% else %}<p class="nota">Nessun testo disponibile con le fonti e gli anni scelti.</p>{% endfor %}</div>
+                    <div class="campo-personalizzato">
+                        <label>Testi personalizzati</label>
+                        {% for i in range(1, 6) %}
+                        <input type="text" id="{{ nome }}_personalizzato_{{ i }}" name="{{ nome }}_personalizzato_{{ i }}" maxlength="200" placeholder="VOCE {{ i }}" class="campo-personalizzato-input">
+                        {% endfor %}
+                    </div>
+                </fieldset>{% endfor %}
+            </div>
+        </fieldset>
+    </form>
+    {% endif %}
+</fieldset>
+<style>
+    .scelta-fonti select { width: 180px; }
+    .fonti-colonne, .pecup-griglie { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; align-items: start; }
+    .pecup-griglie { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .scelta-fonti fieldset, .pecup-griglie fieldset { display: flex; flex-direction: column; height: 100%; margin: 0; }
+    .lista-fonti { height: 180px; overflow: auto; border: 1px solid #7f9db9; padding: 4px; }
+    .anni { padding: 6px; border: 1px solid #7f9db9; }
+    .lista-fonti label, .anni label, .lista-pecup label, .lista-pecup p, select, button, input, legend, .campo-personalizzato label { text-transform: uppercase; }
+    .lista-fonti label, .anni label, .lista-pecup label { font-weight: normal; display: flex; align-items: center; gap: 4px; margin: 2px 0; }
+    .lista-pecup { height: 190px; overflow: auto; border: 1px solid #7f9db9; padding: 4px; }
+    .lista-pecup label { font-weight: bold; }
+    .lista-pecup p { margin: 0; }
+    .campo-personalizzato { margin-top: 8px; display: grid; gap: 4px; }
+    .campo-personalizzato-input { width: 100%; box-sizing: border-box; padding: 4px 6px; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+    .campo-personalizzato-input:disabled { background: #f0f0f0; color: #666; }
+    .seleziona-tutto { padding: 4px 8px; margin-bottom: 6px; }
+    #carica-testi:disabled, #salva-pecup:disabled { background: #ff3b30; color: #fff; }
+    #carica-testi:not(:disabled), #salva-pecup:not(:disabled) { background: #1b5e20; color: #ffeb3b; }
+    .barra-azioni {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        margin-top: 10px;
+        margin-bottom: 0;
+        padding-top: 6px;
+        border-top: 1px solid #d0d0d0;
+    }
+    @media (max-width: 800px) { .fonti-colonne, .pecup-griglie { grid-template-columns: 1fr; } }
+</style>
+<script>
+    const formFonti = document.querySelector('.scelta-fonti');
+    const carica = document.getElementById('carica-testi');
+    const salva = document.getElementById('salva-pecup');
+    if (salva) {
+        salva.hidden = true;
+        salva.disabled = true;
+    }
+    function aggiornaFonti() {
+        const haSelezione = !!formFonti.querySelector('input[name="fonte"]:checked') && !!formFonti.querySelector('input[name="anno"]:checked');
+        carica.disabled = !haSelezione;
+    }
+    formFonti.querySelectorAll('input').forEach(campo => campo.addEventListener('change', aggiornaFonti));
+    aggiornaFonti();
+    const formPecup = document.getElementById('form-pecup');
+    if (formPecup && salva) {
+        function attivaPersonalizzati(tipo) {
+            const campi = Array.from(formPecup.querySelectorAll(`input[name^="${tipo}_personalizzato_"]`));
+            const completati = campi.map(campo => campo.value.trim()).filter(Boolean);
+            campi.forEach((campo, indice) => {
+                const attivo = indice === 0 ? completati.length >= 0 : campi[indice - 1].value.trim() !== '';
+                campo.disabled = !attivo;
+                campo.style.opacity = attivo ? '1' : '0.5';
+                if (!attivo) campo.value = '';
+            });
+        }
+        function gestisciPersonalizzati() {
+            ['abilita', 'conoscenza', 'competenza'].forEach(attivaPersonalizzati);
+        }
+        function aggiornaSalva() {
+            const puoSalvare = ['abilita','conoscenza','competenza'].every(tipo => {
+                const selezionata = formPecup.querySelector(`input[name="${tipo}"]:checked`);
+                const campi = Array.from(formPecup.querySelectorAll(`input[name^="${tipo}_personalizzato_"]`));
+                const personalizzato = campi.some(campo => campo.value.trim().length >= 3);
+                return Boolean(selezionata || personalizzato);
+            });
+            salva.hidden = !puoSalvare;
+            salva.disabled = !puoSalvare;
+            salva.classList.toggle('nascosto', !puoSalvare);
+        }
+        formPecup.querySelectorAll('input[name^="abilita_personalizzato_"], input[name^="conoscenza_personalizzato_"], input[name^="competenza_personalizzato_"]').forEach(campo => {
+            campo.addEventListener('input', () => {
+                campo.value = campo.value.toUpperCase();
+                gestisciPersonalizzati();
+                aggiornaSalva();
+            });
+            campo.addEventListener('change', () => {
+                campo.value = campo.value.toUpperCase();
+                gestisciPersonalizzati();
+                aggiornaSalva();
+            });
+        });
+        formPecup.querySelectorAll('input[name="abilita"], input[name="conoscenza"], input[name="competenza"]').forEach(campo => {
+            campo.addEventListener('change', aggiornaSalva);
+        });
+        gestisciPersonalizzati();
+        aggiornaSalva();
+    }
+</script>
+{% endblock %}

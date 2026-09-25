@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Attendere</title>
+    <style>
+        body { margin: 0; font-family: Tahoma, sans-serif; background: #d9d9d9; }
+        .attesa { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .messaggio { min-width: 320px; padding: 22px 28px; border: 2px solid #000; background: #fff; text-align: center; font-size: 13px; }
+        .messaggio strong { display: block; margin-bottom: 10px; }
+        .rotellina { width: 28px; height: 28px; margin: 0 auto 12px; border: 4px solid #d9d9d9; border-top-color: #1b5e20; border-radius: 50%; animation: gira .8s linear infinite; }
+        @keyframes gira { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <main class="attesa" aria-live="polite">
+        <div class="messaggio">
+            <div class="rotellina" aria-hidden="true"></div>
+            <strong>ATTENDERE - OPERAZIONE IN CORSO</strong>
+            <span id="stato">Preparazione documento...</span>
+        </div>
+    </main>
+    <script>
+        const stato = document.getElementById("stato");
+        const urlStato = {{ url_for("admin_stato_creazione", job_id=job_id) | tojson }};
+        const urlFine = {{ url_for("admin_fine_creazione", job_id=job_id) | tojson }};
+
+        async function aggiorna() {
+            try {
+                const risposta = await fetch(urlStato, { cache: "no-store" });
+                if (!risposta.ok) throw new Error("stato non disponibile");
+                const dati = await risposta.json();
+                stato.textContent = dati.messaggio;
+                if (dati.completato) {
+                    window.location.assign(urlFine);
+                    return;
+                }
+            } catch (errore) {
+                stato.textContent = "Attendere...";
+            }
+            window.setTimeout(aggiorna, 250);
+        }
+
+        aggiorna();
+    </script>
+</body>
+</html>

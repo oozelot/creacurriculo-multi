@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block titolo %}Modulo {{ numero }}{% endblock %}
+{% block intestazione %}MODULO N. {{ numero }}{% endblock %}
+
+{% block contenuto %}
+<div id="attesa-apertura-ud" style="display:none; position:fixed; inset:0; z-index:100000; align-items:center; justify-content:center; background:rgba(0,0,0,.4);">
+    <div style="padding:22px 30px; background:#fff; border:2px solid #333; font-weight:bold; text-align:center;">
+        Attendi l'apertura della pagina...
+    </div>
+</div>
+
+<form method="post" id="form-modulo" class="form-modulo">
+    <fieldset>
+        <legend>Dati del modulo</legend>
+        <div class="griglia griglia-2">
+            <div>
+                <label for="titolo">Titolo</label>
+                <input type="text" id="titolo" name="titolo" maxlength="{{ limiti.titolo_modulo }}"
+                    value="{{ mod.titolo | pulito }}" required>
+            </div>
+            <div>
+                <label for="periodo">Periodo di esecuzione</label>
+                <select id="periodo" name="periodo" required>
+                    <option value="" {% if not mod.periodo | pulito %}selected{% endif %} hidden></option>
+                    {% for periodo in periodi %}
+                    <option value="{{ periodo }}" {% if mod.periodo | pulito == periodo %}selected{% endif %}>{{ periodo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset>
+        <legend class="lista-obbligatoria" data-lista-obbligatoria="spazi">Spazi utilizzati</legend>
+        <div class="scelte">
+            {% for spazio in spazi %}
+            <label><input type="checkbox" name="spazi" value="{{ loop.index }}"
+                    {% if loop.index in mod.spazi %}checked{% endif %}> {{ spazio }}</label>
+            {% endfor %}
+        </div>
+        <div style="margin-top:10px">
+            <div id="campo-altro-spazio" class="campo-altro-spazio inattivo">
+                <label for="spazi_altro">Specificare gli altri spazi</label>
+                <input type="text" id="spazi_altro" name="spazi_altro" maxlength="{{ limiti.spazi_altro }}"
+                value="{{ mod.spazi_altro }}">
+            </div>
+        </div>
+    </fieldset>
+
+</form>
+
+<fieldset style="margin-top:20px">
+    <legend>Unita' didattiche</legend>
+    <table>
+        <tr>
+            <th style="width:60px">N.</th>
+            <th>Titolo</th>
+            <th style="width:110px">Stato</th>
+            <th style="width:190px"></th>
+        </tr>
+        {% for ud in mod.unita %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ ud.titolo | pulito or "(senza titolo)" }}</td>
+            <td style="background-color: {% if ud.completa %}#1b5e20{% else %}#ff3b30{% endif %}; color: {% if ud.completa %}#ffeb3b{% else %}white{% endif %}; text-align: center; font-weight: bold;">
+                {% if ud.completa %}
+                    <b>completa</b>
+                {% else %}
+                    <b>da completare</b>
+                {% endif %}
+            </td>
+            <td>
+                <a class="bottone principale apri-ud" href="{{ url_for('unita', numero=numero, indice=loop.index) }}">Apri</a>
+                <form method="post" action="{{ url_for('elimina_ud', numero=numero, indice=loop.index) }}"
+                    style="display:inline" onsubmit="return confirm('Eliminare questa unita\' didattica?')">
+                    <button type="submit" class="pericolo">Elimina</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4">Nessuna unita' didattica inserita.</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    {% if mod.unita | length < max_ud %}
+    <form method="post" action="{{ url_for('nuova_ud', numero=numero) }}" id="form-nuova-ud">
+        <button type="submit" id="btn-nuova-ud" class="comando-fase principale" style="font-weight: bold;" disabled>+ Nuova unita' didattica</button>
+    </form>
+    {% endif %}
+</fieldset>
+
+<script>
+    const formModulo = document.getElementById("form-modulo");
+    const titoloModulo = document.getElementById("titolo");
+    const periodoModulo = document.getElementById("periodo");
+    const spaziAltro = document.getElementById("spazi_altro");
+    const casellaAltroSpazio = formModulo.querySelector('input[name="spazi"][value="4"]');
+    const campoAltroSpazio = document.getElementById("campo-altro-spazio");
+    const btnNuovaUd = document.getElementById("btn-nuova-ud");
+    const formNuovaUd = document.getElementById("form-nuova-ud");
+    const salvaModuloTop = document.getElementById("salva-modulo");
+    const attesaAperturaUd = document.getElementById("attesa-apertura-ud");
+
+    // Forza il grassetto via script sul pulsante in alto di base.html
+    if (salvaModuloTop) {
+        salvaModuloTop.style.fontWeight = "bold";
+    }
+
+    function coloraCampo(campo, valido) {
+        campo.classList.toggle("campo-rosso", !valido);
+        campo.classList.toggle("campo-verde", valido);
+    }
+
+    function aggiornaModulo() {
+        coloraCampo(titoloModulo, titoloModulo.value.trim().length >= 3);
+        periodoModulo.classList.toggle("campo-rosso", !periodoModulo.value);
+        periodoModulo.classList.toggle("campo-verde", Boolean(periodoModulo.value));
+        
+        const spaziSelezionati = formModulo.querySelectorAll('input[name="spazi"]:checked').length;
+        const spaziLegend = document.querySelector('[data-lista-obbligatoria="spazi"]');
+        spaziLegend.classList.toggle("completa", Boolean(spaziSelezionati));
+        spaziLegend.classList.toggle("incompleta", !spaziSelezionati);
+        
+        const altroValido = !casellaAltroSpazio || !casellaAltroSpazio.checked || spaziAltro.value.trim().length >= 3;
+        if (campoAltroSpazio && casellaAltroSpazio) {
+            campoAltroSpazio.classList.toggle("inattivo", !casellaAltroSpazio.checked);
+            if (casellaAltroSpazio.checked) {
+                coloraCampo(spaziAltro, spaziAltro.value.trim().length >= 3);
+            } else {
+                spaziAltro.classList.remove("campo-rosso", "campo-verde");
+            }
+        }
+
+        const moduloValido = titoloModulo.value.trim().length >= 3
+            && Boolean(periodoModulo.value) && Boolean(spaziSelezionati) && altroValido;
+
+        if (salvaModuloTop) {
+            salvaModuloTop.disabled = !moduloValido;
+        }
+
+        if (btnNuovaUd) {
+            btnNuovaUd.disabled = !moduloValido;
+        }
+    }
+
+    titoloModulo.addEventListener("input", aggiornaModulo);
+    titoloModulo.addEventListener("blur", aggiornaModulo);
+    periodoModulo.addEventListener("change", aggiornaModulo);
+    
+    formModulo.querySelectorAll('input[name="spazi"], #spazi_altro').forEach(campo => {
+        campo.addEventListener("change", aggiornaModulo);
+        campo.addEventListener("input", aggiornaModulo);
+    });
+
+    if (btnNuovaUd && formNuovaUd) {
+        btnNuovaUd.addEventListener("click", async (evento) => {
+            evento.preventDefault();
+            aggiornaModulo();
+            if (btnNuovaUd.disabled) return;
+
+            attesaAperturaUd.style.display = "flex";
+
+            const formData = new FormData(formModulo);
+            try {
+                await fetch(window.location.href, {
+                    method: "POST",
+                    body: formData
+                });
+            } catch (err) {
+                console.error("Errore salvataggio automatico:", err);
+            }
+            formNuovaUd.submit();
+        });
+    }
+
+    document.querySelectorAll(".apri-ud").forEach(link => {
+        link.addEventListener("click", () => {
+            attesaAperturaUd.style.display = "flex";
+        });
+    });
+
+    aggiornaModulo();
+</script>
+{% endblock %}
