@@ -258,7 +258,11 @@ def resetta_database() -> None:
             for riga in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
             )
-            if riga["name"] not in {"pecup_backup", "educazione_civica_backup"}
+            if riga["name"] not in {
+                "pecup_backup",
+                "educazione_civica_backup",
+                "ricevuti",
+            }
         ]
         conn.execute("PRAGMA foreign_keys = OFF")
         for tabella in tabelle:
@@ -270,7 +274,13 @@ def resetta_database() -> None:
         raise RuntimeError("Impossibile ricostruire il catalogo di base.")
     from . import educazione_civica
     educazione_civica.sincronizza_catalogo_file()
-    if not _ripristina_educazione_civica_da_factory() and not ripristina_educazione_civica_backup():
+    ripristinata_da_factory = _ripristina_educazione_civica_da_factory()
+    if ripristinata_da_factory:
+        with connessione() as conn:
+            conn.execute("DELETE FROM educazione_civica_backup")
+            conn.commit()
+        inizializza_backup_stato()
+    elif not ripristina_educazione_civica_backup():
         raise RuntimeError("Impossibile ripristinare la configurazione iniziale di Educazione civica.")
 
 

@@ -758,7 +758,9 @@ def admin_reset():
     session.clear()
     legacy.elimina_cartelle_lavoro()
     if CARTELLA_ADMIN.exists():
-        shutil.rmtree(CARTELLA_ADMIN)
+        for cartella in (CARTELLA_ADMIN_INPUT, CARTELLA_ADMIN_OUTPUT):
+            if cartella.exists():
+                shutil.rmtree(cartella)
     db.resetta_database()
     prepara_cartelle_admin()
     _sessione_inizializzata = True
