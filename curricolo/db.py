@@ -213,13 +213,24 @@ def _percorso_master() -> str | None:
 
 def _inizializza_archivio_factory() -> str | None:
     if FILE_DB_FACTORY.is_file():
+        _svuota_archivio_ricevuti(FILE_DB_FACTORY)
         return str(FILE_DB_FACTORY)
     master = _percorso_master()
     if master is None:
         return None
     FILE_DB_FACTORY.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(master, FILE_DB_FACTORY)
+    _svuota_archivio_ricevuti(FILE_DB_FACTORY)
     return str(FILE_DB_FACTORY)
+
+
+def _svuota_archivio_ricevuti(percorso: str | os.PathLike[str]) -> None:
+    conn = sqlite3.connect(percorso)
+    try:
+        conn.execute("DELETE FROM ricevuti")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _copia_tabelle_da_operativo(tabelle: tuple[str, ...]) -> bool:
@@ -340,7 +351,7 @@ def ripristina_database_factory() -> bool:
     factory = _inizializza_archivio_factory()
     if factory is None:
         return False
-    return _sostituisci_operativo_da_archivio(factory, preserva_ricevuti=True)
+    return _sostituisci_operativo_da_archivio(factory, preserva_ricevuti=False)
 
 
 def ripristina_database_master() -> bool:
@@ -352,6 +363,7 @@ def ripristina_database_master() -> bool:
     temporaneo = FILE_DB_FACTORY.with_name(f"{FILE_DB_FACTORY.name}.master.tmp")
     shutil.copy2(master, temporaneo)
     os.replace(temporaneo, FILE_DB_FACTORY)
+    _svuota_archivio_ricevuti(FILE_DB_FACTORY)
     return _sostituisci_operativo_da_archivio(str(FILE_DB_FACTORY), preserva_ricevuti=False)
 
 

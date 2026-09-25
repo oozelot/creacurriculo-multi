@@ -80,10 +80,10 @@ _ULTIMO_HEARTBEAT = time.monotonic()
 _HEARTBEAT_LOCK = threading.Lock()
 
 
-def prepara_cartelle_admin() -> None:
+def prepara_cartelle_admin(copia_seme: bool = True) -> None:
     for cartella in (CARTELLA_ADMIN, CARTELLA_ADMIN_INPUT, CARTELLA_RICEVUTI, CARTELLA_ADMIN_OUTPUT):
         cartella.mkdir(parents=True, exist_ok=True)
-    if CARTELLA_RICEVUTI_SEME.resolve() != CARTELLA_RICEVUTI.resolve():
+    if copia_seme and CARTELLA_RICEVUTI_SEME.resolve() != CARTELLA_RICEVUTI.resolve():
         for sorgente in CARTELLA_RICEVUTI_SEME.glob("*.ini"):
             destinazione = CARTELLA_RICEVUTI / sorgente.name
             if not destinazione.exists():
@@ -95,6 +95,15 @@ def prepara_cartelle_admin() -> None:
 def prepara_sistema() -> None:
     prepara_cartelle_admin()
     db.inizializza_database()
+
+
+def svuota_file_ricevuti() -> None:
+    CARTELLA_RICEVUTI.mkdir(parents=True, exist_ok=True)
+    for percorso in CARTELLA_RICEVUTI.iterdir():
+        if percorso.is_dir():
+            shutil.rmtree(percorso)
+        else:
+            percorso.unlink()
 
 
 def periodi() -> list[str]:
@@ -239,6 +248,8 @@ def master_factory():
         if not db.ripristina_database_master():
             flash("Archivio master assente o non valido. Nessuna modifica applicata.", "errore")
             return redirect(url_for("master_factory"))
+        svuota_file_ricevuti()
+        prepara_cartelle_admin(copia_seme=False)
         session.clear()
         flash("Master ripristinato: factory modificato e database operativo riallineati.", "info")
         return redirect(url_for("step1"))
@@ -757,12 +768,13 @@ def admin_reset():
     global _sessione_inizializzata
     session.clear()
     legacy.elimina_cartelle_lavoro()
+    svuota_file_ricevuti()
     if CARTELLA_ADMIN.exists():
         for cartella in (CARTELLA_ADMIN_INPUT, CARTELLA_ADMIN_OUTPUT):
             if cartella.exists():
                 shutil.rmtree(cartella)
     db.resetta_database()
-    prepara_cartelle_admin()
+    prepara_cartelle_admin(copia_seme=False)
     _sessione_inizializzata = True
     flash(
         "Lavoro e dati locali azzerati. Il catalogo e la configurazione iniziale "
