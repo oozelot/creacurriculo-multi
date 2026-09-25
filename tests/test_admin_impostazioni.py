@@ -38,3 +38,17 @@ def test_crea_impostazioni_gestisci_errore_scrittura(monkeypatch):
 
     assert response.status_code == 200
     assert "Impossibile creare la cartella dati" in response.get_data(as_text=True)
+
+
+def test_crea_impostazioni_tutti_non_si_interrompe_per_un_file(monkeypatch):
+    def salva_fallisce(_prog):
+        raise OSError("permesso negato")
+
+    monkeypatch.setattr(main.modello, "salva", salva_fallisce)
+    response = app.test_client().post(
+        "/admin/database/file/impostazioni-tutti",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Elementi non elaborati" in response.get_data(as_text=True)

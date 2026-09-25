@@ -1057,18 +1057,36 @@ def admin_file_impostazioni():
 @app.route("/admin/database/file/impostazioni-tutti", methods=["POST"])
 def admin_file_impostazioni_tutti():
     cartelle = []
+    errori = []
     for percorso in archivio.file_ricevuti():
-        cartelle.append(modello.salva(archivio.leggi_file(percorso)))
+        try:
+            cartelle.append(modello.salva(archivio.leggi_file(percorso)))
+        except (OSError, TypeError, ValueError, KeyError, IndexError, json.JSONDecodeError) as errore:
+            app.logger.exception("Creazione cartella fallita per il file ricevuto %s", percorso.name)
+            errori.append(f"{percorso.name}: {errore}")
     for record in archivio.elenca():
-        prog = archivio.programmazione(record["id"])
-        if prog is not None:
-            cartelle.append(modello.salva(prog))
+        try:
+            prog = archivio.programmazione(record["id"])
+            if prog is not None:
+                cartelle.append(modello.salva(prog))
+        except (OSError, TypeError, ValueError, KeyError, IndexError, json.JSONDecodeError) as errore:
+            nome = record.get("nome_file", str(record["id"]))
+            app.logger.exception("Creazione cartella fallita per il record %s", nome)
+            errori.append(f"{nome}: {errore}")
     uniche = sorted({str(percorso.parent) for percorso in cartelle})
-    flash(
-        f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
-        f"Cartelle docenti create: {len(uniche)}.",
-        "info",
-    )
+    if errori:
+        flash(
+            f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
+            f"Cartelle docenti create: {len(uniche)}. Elementi non elaborati: "
+            + " | ".join(errori),
+            "errore",
+        )
+    else:
+        flash(
+            f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
+            f"Cartelle docenti create: {len(uniche)}.",
+            "info",
+        )
     return redirect(url_for("admin_database"))
 
 
