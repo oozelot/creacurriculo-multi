@@ -1033,8 +1033,13 @@ def admin_file_stampe():
 
 @app.route("/admin/database/file/impostazioni", methods=["POST"])
 def admin_file_impostazioni():
-    prog = archivio.leggi_file(_file_ricevuto_selezionato())
-    modello.salva(prog)
+    try:
+        prog = archivio.leggi_file(_file_ricevuto_selezionato())
+        modello.salva(prog)
+    except (OSError, TypeError, ValueError, KeyError) as errore:
+        app.logger.exception("Creazione cartella dati fallita")
+        flash(f"Impossibile creare la cartella dati: {errore}", "errore")
+        return redirect(url_for("admin_database"))
     flash("Create le impostazioni di lavoro del docente.", "info")
     return redirect(url_for("admin_database"))
 
