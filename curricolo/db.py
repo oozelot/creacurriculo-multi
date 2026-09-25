@@ -378,11 +378,8 @@ def ripristina_educazione_civica_backup() -> bool:
     if not righe:
         return _ripristina_educazione_civica_da_factory()
     with connessione() as conn:
+        conn.execute("DELETE FROM educazione_civica_piani")
         for riga in righe:
-            conn.execute(
-                "DELETE FROM educazione_civica_piani WHERE corso = ? AND classe = ?",
-                (riga["corso"], riga["classe"]),
-            )
             for piano in json.loads(riga["dump"]):
                 conn.execute(
                     "INSERT INTO educazione_civica_piani (corso, classe, articolazione, disciplina, dati) VALUES (?, ?, ?, ?, ?)",

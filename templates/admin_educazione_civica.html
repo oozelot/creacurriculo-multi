@@ -204,6 +204,7 @@
     );
     let salvataggioTimer = null;
     let salvataggioInCorso = Promise.resolve();
+    let salvataggioProgrammato = Promise.resolve();
 
     function creaConfigurazione(disciplina) {
         if (!configurazioni[disciplina]) {
@@ -254,7 +255,12 @@
     }
     function programmaSalvataggio(disciplina) {
         window.clearTimeout(salvataggioTimer);
-        salvataggioTimer = window.setTimeout(() => salvaConfigurazione(disciplina), 250);
+        salvataggioProgrammato = new Promise(risolvi => {
+            salvataggioTimer = window.setTimeout(() => {
+                salvataggioTimer = null;
+                salvaConfigurazione(disciplina).then(risolvi, risolvi);
+            }, 250);
+        });
     }
     function raccogliConfigurazione() {
         if (!disciplinaAperta) return null;
@@ -388,5 +394,20 @@
         oreDisciplina.textContent = String(config?.ore_disciplina || 0);
     });
     document.querySelector("#piano-educazione").addEventListener("submit", () => { if (!pannello.hidden) chiudiPannello(); });
+    const formMemorizza = document.querySelector('form[action$="/admin/memorizza-educazione-civica"]');
+    formMemorizza?.addEventListener("submit", async evento => {
+        evento.preventDefault();
+        const disciplinaDaSalvare = disciplinaAperta;
+        if (disciplinaDaSalvare) {
+            window.clearTimeout(salvataggioTimer);
+            raccogliConfigurazione();
+            pannello.hidden = true;
+            disciplinaAperta = "";
+            await salvaConfigurazione(disciplinaDaSalvare);
+        }
+        await salvataggioProgrammato;
+        await salvataggioInCorso;
+        HTMLFormElement.prototype.submit.call(formMemorizza);
+    });
 </script>
 {% endblock %}
