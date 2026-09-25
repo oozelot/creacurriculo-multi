@@ -1062,8 +1062,8 @@ def admin_file_impostazioni_tutti():
         try:
             cartelle.append(modello.salva(archivio.leggi_file(percorso)))
         except (OSError, TypeError, ValueError, KeyError, IndexError, json.JSONDecodeError) as errore:
-            app.logger.exception("Creazione cartella fallita per il file ricevuto %s", percorso.name)
-            errori.append(f"{percorso.name}: {errore}")
+            app.logger.error("Creazione cartella fallita per %s: %s", percorso.name, errore)
+            errori.append(f"{percorso.name} ({type(errore).__name__})")
     for record in archivio.elenca():
         try:
             prog = archivio.programmazione(record["id"])
@@ -1071,13 +1071,13 @@ def admin_file_impostazioni_tutti():
                 cartelle.append(modello.salva(prog))
         except (OSError, TypeError, ValueError, KeyError, IndexError, json.JSONDecodeError) as errore:
             nome = record.get("nome_file", str(record["id"]))
-            app.logger.exception("Creazione cartella fallita per il record %s", nome)
-            errori.append(f"{nome}: {errore}")
+            app.logger.error("Creazione cartella fallita per %s: %s", nome, errore)
+            errori.append(f"{nome} ({type(errore).__name__})")
     uniche = sorted({str(percorso.parent) for percorso in cartelle})
     if errori:
         flash(
             f"Create le impostazioni di lavoro per {len(cartelle)} file in {CARTELLA_LAVORI}. "
-            f"Cartelle docenti create: {len(uniche)}. Elementi non elaborati: "
+            f"Cartelle docenti create: {len(uniche)}. Errori ({len(errori)}): "
             + " | ".join(errori),
             "errore",
         )
