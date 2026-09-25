@@ -375,6 +375,54 @@ def backup_educazione_civica(corso: str, classe: str) -> None:
             (corso, classe, json.dumps(piani, ensure_ascii=False)),
         )
         conn.commit()
+    _salva_backup_educazione_civica_su_file()
+
+
+def _percorso_backup_educazione_civica() -> str:
+    return str(CARTELLA_DATI / "educazione_civica_iniziale.json")
+
+
+def _salva_backup_educazione_civica_su_file() -> None:
+    with connessione() as conn:
+        righe = [
+            dict(riga)
+            for riga in conn.execute(
+                "SELECT corso, classe, dump, aggiornato_il FROM educazione_civica_backup "
+                "ORDER BY corso, classe"
+            )
+        ]
+    percorso = _percorso_backup_educazione_civica()
+    temporaneo = f"{percorso}.tmp"
+    CARTELLA_DATI.mkdir(parents=True, exist_ok=True)
+    with open(temporaneo, "w", encoding="utf-8") as file:
+        json.dump(righe, file, ensure_ascii=False)
+    os.replace(temporaneo, percorso)
+
+
+def _ripristina_backup_educazione_civica_da_file() -> bool:
+    percorso = _percorso_backup_educazione_civica()
+    if not os.path.isfile(percorso):
+        return False
+    try:
+        with open(percorso, encoding="utf-8") as file:
+            righe = json.load(file)
+        if not isinstance(righe, list) or not righe:
+            return False
+    except (OSError, json.JSONDecodeError):
+        return False
+    with connessione() as conn:
+        conn.execute("DELETE FROM educazione_civica_backup")
+        conn.executemany(
+            "INSERT INTO educazione_civica_backup "
+            "(corso, classe, dump, aggiornato_il) VALUES (?, ?, ?, ?)",
+            [
+                (riga["corso"], riga["classe"], riga["dump"], riga.get("aggiornato_il", ""))
+                for riga in righe
+                if isinstance(riga, dict) and {"corso", "classe", "dump"}.issubset(riga)
+            ],
+        )
+        conn.commit()
+    return True
 
 
 def ripristina_educazione_civica_backup() -> bool:
@@ -382,6 +430,8 @@ def ripristina_educazione_civica_backup() -> bool:
     with connessione() as conn:
         righe = conn.execute("SELECT corso, classe, dump FROM educazione_civica_backup").fetchall()
     if not righe:
+        if _ripristina_backup_educazione_civica_da_file():
+            return ripristina_educazione_civica_backup()
         return _ripristina_educazione_civica_da_factory()
     with connessione() as conn:
         conn.execute("DELETE FROM educazione_civica_piani")
