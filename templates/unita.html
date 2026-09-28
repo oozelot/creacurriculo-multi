@@ -1124,13 +1124,6 @@
     }
 
 
-    function strutturaCodiceValida(codice) {
-
-        return /^[A-Z0-9]{3}[TACGpeg](BIE|345|34-)(AB|CS|CT)P\d{2}$/.test(codice);
-
-    }
-
-
     /* ========================================================= */
     /* INDIVIDUAZIONE CATEGORIA                                 */
     /* ========================================================= */
@@ -1175,8 +1168,7 @@
             normalizzaCodice(codice);
 
 
-        return strutturaCodiceValida(codiceNorm)
-            && codiceNorm.slice(7, 9) === sigla;
+        return codiceNorm.slice(7, 9) === sigla;
 
     }
 
