@@ -39,23 +39,45 @@ jobs:
       run: python -m pip install pywin32
 
     - name: Esegui PyInstaller
+      if: runner.os != 'macOS'
       run: |
         python tools/pulisci_build.py
         python -m PyInstaller --clean --noconfirm CreaCurricolo.spec
         python -m compileall -q main.py curricolo
 
+    - name: Prepara il pacchetto macOS con Python ufficiale
+      if: runner.os == 'macOS'
+      run: |
+        python tools/pulisci_build.py
+        python -m compileall -q main.py curricolo tools/avvia_mac.py
+        python tools/prepara_dist.py dist/CreaCurricoloMulti --macos-sorgente
+
     - name: Prepara gli archivi iniziali della distribuzione
+      if: runner.os != 'macOS'
       run: python tools/prepara_dist.py dist/CreaCurricoloMulti
 
     - name: Verifica pacchetto prodotto
       run: |
-        test -f "dist/CreaCurricoloMulti/CreaCurricoloMulti${{ runner.os == 'Windows' && '.exe' || '' }}"
-        test -d "dist/CreaCurricoloMulti/_internal"
+        if [ "$RUNNER_OS" = "macOS" ]; then
+          test -f "dist/CreaCurricoloMulti/Avvia CreaCurricolo.command"
+          test -f "dist/CreaCurricoloMulti/main.py"
+          test -f "dist/CreaCurricoloMulti/curricolobak-modificato.db"
+          test ! -e "dist/CreaCurricoloMulti/dati/curricolo.db"
+          test ! -e "dist/CreaCurricoloMulti/DIPARTIMENTO_DIRITTO"
+        else
+          test -f "dist/CreaCurricoloMulti/CreaCurricoloMulti${{ runner.os == 'Windows' && '.exe' || '' }}"
+          test -d "dist/CreaCurricoloMulti/_internal"
+        fi
       shell: bash
 
     - name: Rendi eseguibile il launcher Unix
       if: runner.os != 'Windows'
-      run: chmod +x dist/CreaCurricoloMulti/CreaCurricoloMulti
+      run: |
+        if [ "$RUNNER_OS" = "macOS" ]; then
+          chmod +x "dist/CreaCurricoloMulti/Avvia CreaCurricolo.command"
+        else
+          chmod +x dist/CreaCurricoloMulti/CreaCurricoloMulti
+        fi
       shell: bash
 
     - name: Salva l'eseguibile come pacchetto

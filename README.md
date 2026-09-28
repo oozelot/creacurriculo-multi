@@ -29,11 +29,22 @@ Aprire quindi `http://127.0.0.1:5000`.
 
 ## Build
 
-La build PyInstaller deve essere eseguita sul sistema operativo di destinazione. Il workflow GitHub Actions in `.github/workflows/build.yml` crea pacchetti separati per Windows, macOS e Linux con il nome `CreaCurricoloMulti`.
+La build PyInstaller deve essere eseguita sul sistema operativo di destinazione. Il workflow GitHub Actions in `.github/workflows/build.yml` crea pacchetti separati per Windows, macOS e Linux con il nome `CreaCurricoloMulti`. Su macOS il pacchetto usa il Python installato sul computer anziche' includere un runtime Python non firmato.
 I pacchetti includono lo snapshot Admin memorizzato e il database Master; il database
 Corrente e i file INI ricevuti non vengono distribuiti. Per pubblicare i tre ZIP,
 creare un tag `v*`: il workflow verifica e prepara gli archivi prima di allegarli
 alla Release GitHub.
+
+### Avvio su macOS
+
+Estrai lo ZIP e apri `Avvia CreaCurricolo.command`. Serve Python 3.10 o successivo.
+Se non e' disponibile, il launcher apre la pagina ufficiale dei download Python:
+installa il pacchetto macOS universal2 di python.org, firmato e notarizzato, quindi
+riapri il launcher (l'installer potrebbe chiedere la password di amministratore).
+Al primo avvio crea un ambiente virtuale e installa le
+dipendenze da PyPI. Se macOS blocca il file `.command`, usa Finder per consentirne
+l'apertura; il runtime Python viene invece eseguito dall'installazione ufficiale
+di Python.
 
 La generazione dei documenti Word non richiede Microsoft Office o LibreOffice.
 Per esportare in PDF l'applicazione usa, in ordine, LibreOffice e Microsoft Word
