@@ -16,9 +16,8 @@ done
 
 if [[ -z "$PYTHON" ]]; then
     echo "Per avviare CreaCurricoloMulti serve Python 3.10 o successivo."
-    echo "Apro la pagina ufficiale Python: installa il pacchetto macOS universale (universal2), poi riavvia questo launcher."
+    echo "Scarica e installa il pacchetto macOS universale (universal2) dalla pagina ufficiale, poi riavvia questo launcher."
     open "https://www.python.org/downloads/macos/" || true
-    read -r -p "Premi Invio per chiudere. "
     exit 1
 fi
 

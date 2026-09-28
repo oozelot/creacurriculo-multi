@@ -37,6 +37,10 @@ def test_pacchetto_macos_usa_archivi_memorizzati_senza_corrente_o_ini(monkeypatc
     prepara_dist.prepara_distribuzione_macos(distribuzione)
 
     assert (distribuzione / "Avvia CreaCurricolo.command").is_file()
+    launcher = (distribuzione / "Avvia CreaCurricolo.command").read_text(encoding="utf-8")
+    ramo_python_mancante = launcher.split('if [[ ! -x ".venv/bin/python" ]]')[0]
+    assert "Scarica e installa il pacchetto macOS universale" in ramo_python_mancante
+    assert "read -r -p" not in ramo_python_mancante
     assert (distribuzione / "curricolobak.db").is_file()
     assert (distribuzione / "curricolobak-modificato.db").is_file()
     assert not (distribuzione / "dati" / "curricolo.db").exists()
