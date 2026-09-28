@@ -30,6 +30,10 @@ Aprire quindi `http://127.0.0.1:5000`.
 ## Build
 
 La build PyInstaller deve essere eseguita sul sistema operativo di destinazione. Il workflow GitHub Actions in `.github/workflows/build.yml` crea pacchetti separati per Windows, macOS e Linux con il nome `CreaCurricoloMulti`.
+I pacchetti includono lo snapshot Admin memorizzato e il database Master; il database
+Corrente e i file INI ricevuti non vengono distribuiti. Per pubblicare i tre ZIP,
+creare un tag `v*`: il workflow verifica e prepara gli archivi prima di allegarli
+alla Release GitHub.
 
 La generazione dei documenti Word non richiede Microsoft Office o LibreOffice.
 Per esportare in PDF l'applicazione usa, in ordine, LibreOffice e Microsoft Word
@@ -41,3 +45,23 @@ I dati creati dall'applicazione sono salvati accanto all'eseguibile nella cartel
 della distribuzione: il database, le cartelle `ADMIN` e le cartelle dei docenti
 vengono creati direttamente nell'AppPath. Le risorse incluse nel pacchetto non
 vengono usate come archivio dei dati generati.
+
+## Database e ripristini
+
+L'applicazione mantiene tre archivi distinti:
+
+- `curricolobak.db`: stato Master iniziale, usato come riferimento per il ripristino Master.
+- `curricolobak-modificato.db`: stato Admin approvato, aggiornato dai comandi di memorizzazione.
+- `dati/curricolo.db`: stato Corrente, usato durante il lavoro e per acquisire i file INI.
+
+Il ripristino Master riallinea solo il database Corrente al Master e non modifica
+l'archivio Admin. Il ripristino Admin riallinea solo il Corrente all'ultimo stato
+Admin memorizzato. Entrambi i ripristini svuotano nel database Corrente i record
+INI e le conferme dei periodi, che possono essere riacquisiti importando nuovamente
+i file. Per aggiornare l'archivio Admin dopo il ripristino Master, usare in Admin
+il comando di memorizzazione delle materie, dei percorsi e dei codici PECUP.
+
+La memorizzazione PECUP aggiorna nel checkpoint Admin l'elenco dei codici e delle
+descrizioni, oltre a materie e percorsi attivi; non copia le associazioni PECUP
+derivate dai file INI. La memorizzazione di Educazione civica salva il quadro del
+corso e della classe selezionati, senza le conferme di periodo provenienti dagli INI.

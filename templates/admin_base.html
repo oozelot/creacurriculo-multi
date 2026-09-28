@@ -255,12 +255,12 @@
                     <form method="post" action="{{ url_for('admin_reset_pecup') }}"
                         onsubmit="var password=prompt('Password admin per reset codici PECUP allo stato iniziale'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
                         <input type="hidden" name="password" value="">
-                        <button type="submit">RESET CODICI E SITUAZIONE ALLO STATO INIZIALE</button>
+                        <button type="submit">RIPRISTINA ULTIMO STATO ADMIN MEMORIZZATO</button>
                     </form>
                     <form method="post" action="{{ url_for('admin_memorizza_pecup') }}"
                         onsubmit="if(!confirm('ATTENZIONE: I DATI PECUP ATTUALI SOSTITUIRANNO QUELLI DELLO STATO INIZIALE.\n\nPremere OK per procedere, Annulla per tornare indietro.')){ return false; } var password=prompt('Password admin per memorizzare i codici PECUP'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
                         <input type="hidden" name="password" value="">
-                        <button type="submit">MEMORIZZA CODICI PECUP</button>
+                        <button type="submit">MEMORIZZA MATERIE E CODICI PECUP</button>
                     </form>
                     {% if sezione == 'educazione-civica' %}
                     <form method="post" action="{{ url_for('admin_memorizza_educazione_civica') }}"

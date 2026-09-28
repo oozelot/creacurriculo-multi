@@ -12,12 +12,14 @@ import re
 import shutil
 import sqlite3
 import unicodedata
+import uuid
+from pathlib import Path
 
 from .config import (
     CARTELLA_DATI,
     FILE_DB,
-    FILE_DB_FACTORY,
-    FILE_DB_FACTORY_ALTERNATIVO,
+    FILE_DB_ADMIN,
+    FILE_DB_ADMIN_ALTERNATIVO,
     FILE_DB_MASTER,
     FILE_DB_MASTER_ALTERNATIVO,
 )
@@ -211,65 +213,109 @@ def _percorso_master() -> str | None:
     return None
 
 
-def _inizializza_archivio_factory() -> str | None:
-    if FILE_DB_FACTORY.is_file():
-        _svuota_archivio_ricevuti(FILE_DB_FACTORY)
-        return str(FILE_DB_FACTORY)
+def _inizializza_archivio_admin() -> str | None:
+    if FILE_DB_ADMIN.is_file():
+        _normalizza_archivio_senza_ini(FILE_DB_ADMIN)
+        return str(FILE_DB_ADMIN)
     master = _percorso_master()
     if master is None:
         return None
-    FILE_DB_FACTORY.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(master, FILE_DB_FACTORY)
-    _svuota_archivio_ricevuti(FILE_DB_FACTORY)
-    return str(FILE_DB_FACTORY)
+    FILE_DB_ADMIN.parent.mkdir(parents=True, exist_ok=True)
+    temporaneo = _prepara_copia_archivio(master, FILE_DB_ADMIN)
+    os.replace(temporaneo, FILE_DB_ADMIN)
+    return str(FILE_DB_ADMIN)
 
 
-def _svuota_archivio_ricevuti(percorso: str | os.PathLike[str]) -> None:
+def _normalizza_archivio_senza_ini(percorso: str | os.PathLike[str]) -> None:
     conn = sqlite3.connect(percorso)
     try:
         conn.execute("DELETE FROM ricevuti")
+        _azzera_conferme_piani(conn)
+        _azzera_conferme_backup_educazione(conn)
         conn.commit()
     finally:
         conn.close()
 
 
-def _copia_tabelle_da_operativo(tabelle: tuple[str, ...]) -> bool:
-    factory = _inizializza_archivio_factory()
-    if factory is None:
-        return False
-    origine = sqlite3.connect(FILE_DB)
-    destinazione = sqlite3.connect(factory)
-    try:
-        origine.row_factory = sqlite3.Row
-        for tabella in reversed(tabelle):
-            colonne = [riga["name"] for riga in origine.execute(f'PRAGMA table_info("{tabella}")')]
-            if not colonne:
+def _azzera_conferme_piani(conn: sqlite3.Connection) -> None:
+    for riga in conn.execute("SELECT rowid, dati FROM educazione_civica_piani").fetchall():
+        try:
+            dati = json.loads(riga["dati"] if isinstance(riga, sqlite3.Row) else riga[1])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(dati, dict) or not dati.get("conferme"):
+            continue
+        dati["conferme"] = {}
+        conn.execute(
+            "UPDATE educazione_civica_piani SET dati = ? WHERE rowid = ?",
+            (json.dumps(dati, ensure_ascii=False), riga["rowid"] if isinstance(riga, sqlite3.Row) else riga[0]),
+        )
+
+
+def _azzera_conferme_backup_educazione(conn: sqlite3.Connection) -> None:
+    for riga in conn.execute(
+        "SELECT corso, classe, dump FROM educazione_civica_backup"
+    ).fetchall():
+        try:
+            piani = json.loads(riga["dump"] if isinstance(riga, sqlite3.Row) else riga[2])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        aggiornato = False
+        for piano in piani if isinstance(piani, list) else []:
+            if not isinstance(piano, dict):
                 continue
-            destinazione.execute(f'DELETE FROM "{tabella}"')
-        for tabella in tabelle:
-            colonne = [riga["name"] for riga in origine.execute(f'PRAGMA table_info("{tabella}")')]
-            if not colonne:
+            try:
+                dati = json.loads(piano["dati"]) if isinstance(piano.get("dati"), str) else piano.get("dati")
+            except (json.JSONDecodeError, TypeError):
                 continue
-            valori = [tuple(riga[colonna] for colonna in colonne) for riga in origine.execute(f'SELECT * FROM "{tabella}"')]
-            segnaposto = ", ".join("?" for _ in colonne)
-            destinazione.executemany(
-                f'INSERT INTO "{tabella}" ({", ".join(colonne)}) VALUES ({segnaposto})',
-                valori,
+            if isinstance(dati, dict) and dati.get("conferme"):
+                dati["conferme"] = {}
+                piano["dati"] = json.dumps(dati, ensure_ascii=False)
+                aggiornato = True
+        if aggiornato:
+            conn.execute(
+                "UPDATE educazione_civica_backup SET dump = ? WHERE corso = ? AND classe = ?",
+                (
+                    json.dumps(piani, ensure_ascii=False),
+                    riga["corso"] if isinstance(riga, sqlite3.Row) else riga[0],
+                    riga["classe"] if isinstance(riga, sqlite3.Row) else riga[1],
+                ),
             )
-        destinazione.commit()
-    finally:
-        origine.close()
-        destinazione.close()
-    return True
+
+
+def _prepara_copia_archivio(
+    origine: str | os.PathLike[str], destinazione: str | os.PathLike[str]
+) -> Path:
+    destinazione = Path(destinazione)
+    destinazione.parent.mkdir(parents=True, exist_ok=True)
+    temporaneo = destinazione.with_name(f"{destinazione.name}.{uuid.uuid4().hex}.tmp")
+    shutil.copy2(origine, temporaneo)
+    conn = sqlite3.connect(temporaneo)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("DELETE FROM ricevuti")
+        _azzera_conferme_piani(conn)
+        _azzera_conferme_backup_educazione(conn)
+        controllo = conn.execute("PRAGMA integrity_check").fetchone()[0]
+        if controllo != "ok":
+            raise sqlite3.DatabaseError(f"Archivio non integro: {controllo}")
+        conn.commit()
+    except Exception:
+        conn.close()
+        temporaneo.unlink(missing_ok=True)
+        raise
+    conn.close()
+    return temporaneo
 
 
 def inizializza_database() -> None:
     """Crea il database e ricostruisce il catalogo se manca del tutto."""
-    factory = _inizializza_archivio_factory()
+    archivio_admin = _inizializza_archivio_admin()
     database_nuovo = not FILE_DB.exists()
-    if database_nuovo and factory is not None:
+    if database_nuovo and archivio_admin is not None:
         CARTELLA_DATI.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(factory, FILE_DB)
+        temporaneo = _prepara_copia_archivio(archivio_admin, FILE_DB)
+        os.replace(temporaneo, FILE_DB)
         database_nuovo = False
     with connessione() as conn:
         catalogo_vuoto = conn.execute("SELECT COUNT(*) FROM classi").fetchone()[0] == 0
@@ -324,9 +370,8 @@ def _sostituisci_operativo_da_archivio(archivio: str, preserva_ricevuti: bool) -
             ricevuti = [dict(riga) for riga in conn.execute("SELECT * FROM ricevuti")]
         finally:
             conn.close()
-    temporaneo = FILE_DB.with_name(f"{FILE_DB.name}.restore.tmp")
     CARTELLA_DATI.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(archivio, temporaneo)
+    temporaneo = _prepara_copia_archivio(archivio, FILE_DB)
     os.replace(temporaneo, FILE_DB)
     if ricevuti:
         with connessione() as conn:
@@ -342,43 +387,119 @@ def _sostituisci_operativo_da_archivio(archivio: str, preserva_ricevuti: bool) -
 
 def resetta_database() -> None:
     """Azzera i dati locali e ricrea anche la configurazione civica iniziale."""
-    if not ripristina_database_factory():
-        raise RuntimeError("Impossibile ripristinare il factory modificato.")
+    if not ripristina_database_admin():
+        raise RuntimeError("Impossibile ripristinare lo stato Admin.")
 
 
 def ripristina_database_factory() -> bool:
-    """Copia il secondo archivio sul database operativo."""
-    factory = _inizializza_archivio_factory()
-    if factory is None:
+    """Alias compatibile: ripristina il database Corrente dallo stato Admin."""
+    return ripristina_database_admin()
+
+
+def ripristina_database_admin() -> bool:
+    """Copia l'archivio Admin sul database Corrente."""
+    archivio_admin = _inizializza_archivio_admin()
+    if archivio_admin is None:
         return False
-    return _sostituisci_operativo_da_archivio(factory, preserva_ricevuti=False)
+    return _sostituisci_operativo_da_archivio(archivio_admin, preserva_ricevuti=False)
 
 
 def ripristina_database_master() -> bool:
-    """Copia il master sul secondo archivio e poi sul database operativo."""
+    """Ripristina il database Corrente dal Master, senza modificare l'archivio Admin."""
     master = _percorso_master()
     if master is None:
         return False
-    FILE_DB_FACTORY.parent.mkdir(parents=True, exist_ok=True)
-    temporaneo = FILE_DB_FACTORY.with_name(f"{FILE_DB_FACTORY.name}.master.tmp")
-    shutil.copy2(master, temporaneo)
-    os.replace(temporaneo, FILE_DB_FACTORY)
-    _svuota_archivio_ricevuti(FILE_DB_FACTORY)
-    return _sostituisci_operativo_da_archivio(str(FILE_DB_FACTORY), preserva_ricevuti=False)
+    return _sostituisci_operativo_da_archivio(master, preserva_ricevuti=False)
 
 
 def memorizza_pecup_factory() -> bool:
-    """Aggiorna nel secondo archivio i codici PECUP dell'operativo."""
-    return _copia_tabelle_da_operativo(("pecup", "pecup_validita"))
+    """Memorizza codici PECUP e quadro delle materie, senza nuove associazioni PECUP."""
+    archivio_admin = _inizializza_archivio_admin()
+    if archivio_admin is None:
+        return False
+    origine = sqlite3.connect(FILE_DB)
+    destinazione = sqlite3.connect(archivio_admin)
+    origine.row_factory = sqlite3.Row
+    destinazione.row_factory = sqlite3.Row
+    try:
+        destinazione.execute("PRAGMA foreign_keys = ON")
+        codici = [
+            (riga["tipo"], riga["codice"], riga["descrizione"])
+            for riga in origine.execute("SELECT tipo, codice, descrizione FROM pecup ORDER BY tipo, codice")
+        ]
+        materie = [
+            tuple(riga)
+            for riga in origine.execute(
+                "SELECT id, nome, sigla, sigla_ini, attende_ini FROM discipline ORDER BY id"
+            )
+        ]
+        percorsi = [
+            tuple(riga)
+            for riga in origine.execute(
+                "SELECT disciplina_id, indirizzo_id, classe FROM offerta_formativa "
+                "ORDER BY disciplina_id, indirizzo_id, classe"
+            )
+        ]
+        destinazione.execute("BEGIN IMMEDIATE")
+        chiavi_correnti = {(tipo, codice) for tipo, codice, _ in codici}
+        codici_esistenti = {
+            (riga["tipo"], riga["codice"]): int(riga["id"])
+            for riga in destinazione.execute("SELECT id, tipo, codice FROM pecup")
+        }
+        for chiave, identificativo in codici_esistenti.items():
+            if chiave not in chiavi_correnti:
+                destinazione.execute("DELETE FROM pecup WHERE id = ?", (identificativo,))
+
+        for tipo, codice, descrizione in codici:
+            identificativo = codici_esistenti.get((tipo, codice))
+            if identificativo is None:
+                destinazione.execute(
+                    "INSERT INTO pecup (tipo, codice, descrizione) VALUES (?, ?, ?)",
+                    (tipo, codice, descrizione),
+                )
+            else:
+                destinazione.execute(
+                    "UPDATE pecup SET descrizione = ? WHERE id = ?",
+                    (descrizione, identificativo),
+                )
+
+        destinazione.execute("DELETE FROM offerta_formativa")
+        destinazione.execute("DELETE FROM discipline")
+        destinazione.executemany(
+            "INSERT INTO discipline (id, nome, sigla, sigla_ini, attende_ini) VALUES (?, ?, ?, ?, ?)",
+            materie,
+        )
+        destinazione.executemany(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (?, ?, ?)",
+            percorsi,
+        )
+        destinazione.execute(
+            """
+            DELETE FROM pecup_validita
+             WHERE upper(trim(disciplina)) NOT IN (
+                 SELECT upper(trim(nome)) FROM discipline
+             )
+            """
+        )
+        destinazione.execute("DELETE FROM ricevuti")
+        _azzera_conferme_piani(destinazione)
+        destinazione.commit()
+    except Exception:
+        destinazione.rollback()
+        raise
+    finally:
+        origine.close()
+        destinazione.close()
+    return True
 
 
 def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
-    """Aggiorna nel secondo archivio il piano civico indicato."""
-    factory = _inizializza_archivio_factory()
-    if factory is None:
+    """Memorizza il quadro civico del contesto, senza dati di conferma provenienti dagli INI."""
+    archivio_admin = _inizializza_archivio_admin()
+    if archivio_admin is None:
         return False
     origine = sqlite3.connect(FILE_DB)
-    destinazione = sqlite3.connect(factory)
+    destinazione = sqlite3.connect(archivio_admin)
     try:
         origine.row_factory = sqlite3.Row
         destinazione.execute(
@@ -389,9 +510,19 @@ def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
             "SELECT articolazione, disciplina, dati FROM educazione_civica_piani WHERE corso = ? AND classe = ?",
             (corso, classe),
         ).fetchall()
+        piani = []
+        for riga in righe:
+            dati = json.loads(riga["dati"])
+            if not isinstance(dati, dict):
+                raise ValueError("Formato non valido nel piano di Educazione civica.")
+            dati["conferme"] = {}
+            piani.append(
+                (corso, classe, riga["articolazione"], riga["disciplina"], json.dumps(dati, ensure_ascii=False))
+            )
         destinazione.executemany(
-            "INSERT INTO educazione_civica_piani (corso, classe, articolazione, disciplina, dati) VALUES (?, ?, ?, ?, ?)",
-            [(corso, classe, riga["articolazione"], riga["disciplina"], riga["dati"]) for riga in righe],
+            "INSERT INTO educazione_civica_piani "
+            "(corso, classe, articolazione, disciplina, dati) VALUES (?, ?, ?, ?, ?)",
+            piani,
         )
         destinazione.commit()
     finally:
@@ -486,14 +617,14 @@ def ripristina_educazione_civica_factory() -> bool:
 
 
 def _ripristina_educazione_civica_da_factory() -> bool:
-    """Ricostruisce i piani civici dal factory se manca lo snapshot operativo."""
-    factory = next(
-        (percorso for percorso in (FILE_DB_FACTORY, FILE_DB_FACTORY_ALTERNATIVO) if percorso.is_file()),
+    """Ricostruisce i piani civici dallo stato Admin se manca lo snapshot operativo."""
+    archivio_admin = next(
+        (percorso for percorso in (FILE_DB_ADMIN, FILE_DB_ADMIN_ALTERNATIVO) if percorso.is_file()),
         None,
     )
-    if factory is None:
+    if archivio_admin is None:
         return False
-    with sqlite3.connect(factory) as origine:
+    with sqlite3.connect(archivio_admin) as origine:
         origine.row_factory = sqlite3.Row
         piani = origine.execute(
             "SELECT corso, classe, articolazione, disciplina, dati FROM educazione_civica_piani"

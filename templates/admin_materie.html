@@ -28,7 +28,8 @@
                 {% endfor %}
             </div>
             <div class="barra">
-                <form method="post" id="form-elimina">
+                <form method="post" action="{{ url_for('admin_elimina_materia') }}" id="form-elimina">
+                    <input type="hidden" name="identificativo" id="materia-da-eliminare">
                     <button type="submit" id="elimina-materia" disabled>Elimina</button>
                     <button type="button" id="modifica-materia" disabled>Modifica</button>
                 </form>
@@ -77,6 +78,85 @@
         <form method="post" action="{{ url_for('admin_annulla_modifica_materia', identificativo=materia_selezionata.id) }}"><button type="submit">Annulla</button></form>
     </div></div></div>
 {% endif %}
+{% if operazione_materia %}
+<div class="velo" role="dialog" aria-modal="true" aria-labelledby="titolo-operazione-materia">
+    <div class="popup popup-operazione">
+        {% if operazione_materia.fase == 'conferma' %}
+        <strong id="titolo-operazione-materia">
+            {{ 'Rimozione di percorsi' if operazione_materia.tipo == 'percorsi' else 'Eliminazione materia' }}:
+            {{ operazione_materia.materia.nome }}
+        </strong>
+        {% if operazione_materia.piani %}
+        <p>La materia ha contenuti e ore di Educazione civica nei contesti seguenti:</p>
+        <div class="riepilogo-rimozione">
+            {% for piano in operazione_materia.piani %}
+            <div>
+                <strong>{{ piano.corso }} {{ piano.classe }} {{ piano.articolazione }} - {{ piano.disciplina }}</strong>
+                <span>{{ piano.dati.ore_disciplina or 0 }} ore</span>
+                {% for voce in piano.dati.voci or [] %}
+                <small>{{ voce.voce }}: {{ voce.ore }} ore</small>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        <p>Puoi trasferire tutti i contenuti a materie compatibili oppure eliminarli e completare il quadro nella sezione Educazione civica.</p>
+        <div class="barra">
+            <form method="post" action="{{ url_for('admin_decidi_eliminazione_materia') }}">
+                <input type="hidden" name="azione" value="trasferisci">
+                <button type="submit">OK, scegli le materie destinatarie</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_decidi_eliminazione_materia') }}">
+                <input type="hidden" name="azione" value="senza_trasferire">
+                <button type="submit">Annulla trasferimento: elimina e gestisci Educazione civica</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_decidi_eliminazione_materia') }}">
+                <input type="hidden" name="azione" value="annulla">
+                <button type="submit">Annulla eliminazione</button>
+            </form>
+        </div>
+        {% else %}
+        <p>Non ci sono piani di Educazione civica collegati agli elementi rimossi. Confermi l'eliminazione?</p>
+        <div class="barra">
+            <form method="post" action="{{ url_for('admin_decidi_eliminazione_materia') }}">
+                <input type="hidden" name="azione" value="senza_trasferire">
+                <button type="submit">Conferma eliminazione</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_decidi_eliminazione_materia') }}">
+                <input type="hidden" name="azione" value="annulla">
+                <button type="submit">Annulla</button>
+            </form>
+        </div>
+        {% endif %}
+        {% else %}
+        <strong id="titolo-operazione-materia">Scegli le materie destinatarie</strong>
+        <p>Seleziona una materia compatibile per ogni contesto. Le ore pianificate saranno sommate alle voci già presenti; le conferme dei periodi dovranno essere ricaricate dagli INI.</p>
+        <form method="post" action="{{ url_for('admin_memorizza_rimozione_materia') }}" id="form-trasferimento-educazione">
+            <div class="destinazioni-rimozione">
+                {% for piano in operazione_materia.piani %}
+                <fieldset class="destinazione-rimozione">
+                    <legend>{{ piano.corso }} {{ piano.classe }} {{ piano.articolazione }} - {{ piano.disciplina }}</legend>
+                    <p>{{ piano.dati.ore_disciplina or 0 }} ore da trasferire</p>
+                    <div class="lista-destinazioni">
+                        {% for destinazione in piano.destinatari %}
+                        <label><input type="radio" name="destinatario_{{ piano.indice }}" value="{{ destinazione.id }}" required> {{ destinazione.nome }}</label>
+                        {% else %}
+                        <p class="nota">Nessuna materia compatibile in questo contesto. Esci senza memorizzare oppure elimina senza trasferire.</p>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+                {% endfor %}
+            </div>
+            <div class="barra">
+                <button type="submit" {{ 'disabled' if operazione_materia.piani|selectattr('destinatari')|list|length != operazione_materia.piani|length }}>Memorizza trasferimenti ed eliminazione</button>
+            </div>
+        </form>
+        <form method="post" action="{{ url_for('admin_esci_rimozione_materia') }}" class="barra">
+            <button type="submit">Esci senza memorizzare</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 <div class="velo nascosto" id="attendere"><div class="popup"><strong>Attendere...</strong><p>Caricamento dei dati della materia.</p></div></div>
 
 <style>
@@ -106,6 +186,13 @@
     #aggiungi-materia:not(:disabled) { background: #1b5e20; color: #ffeb3b; }
     .velo { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); z-index: 10; }
     .popup { max-width: 430px; padding: 16px; border: 2px solid #000; background: #fff; font-size: 12px; }
+    .popup-operazione { max-width: 760px; max-height: 90vh; overflow: auto; }
+    .riepilogo-rimozione, .destinazioni-rimozione { display: grid; gap: 8px; max-height: 45vh; overflow: auto; }
+    .riepilogo-rimozione > div, .destinazione-rimozione { border: 1px solid #9a9a9a; padding: 6px; }
+    .riepilogo-rimozione span, .riepilogo-rimozione small { display: block; }
+    .destinazione-rimozione { min-width: 0; margin: 0; }
+    .lista-destinazioni { max-height: 110px; overflow: auto; border: 1px solid #7f9db9; padding: 4px; }
+    .lista-destinazioni label { display: flex; align-items: center; gap: 5px; }
     .nascosto { display: none; }
     @media (max-width: 800px) { .materie-layout { grid-template-columns: 1fr; } }
 </style>
@@ -148,23 +235,20 @@
     document.querySelectorAll('input[name="materia"]').forEach(campo => campo.addEventListener("change", () => {
         elimina.disabled = false;
         modifica.disabled = false;
-        document.getElementById("form-elimina").action = `/admin/materie/${campo.value}/elimina`;
+        document.getElementById("materia-da-eliminare").value = campo.value;
         modifica.dataset.materia = campo.value;
     }));
     modifica.addEventListener("click", () => {
         attendere.classList.remove("nascosto");
         window.location.assign(`/admin/materie?materia=${modifica.dataset.materia}`);
     });
-    document.getElementById("form-elimina").addEventListener("submit", evento => {
-        if (!confirm("Eliminare questa materia dal quadro attivo? I record ricevuti restano conservati.")) evento.preventDefault();
-        else attendere.classList.remove("nascosto");
-    });
+    document.getElementById("form-elimina").addEventListener("submit", () => attendere.classList.remove("nascosto"));
     formMateria.addEventListener("submit", () => attendere.classList.remove("nascosto"));
     const materiaIniziale = document.querySelector('input[name="materia"]:checked');
     if (materiaIniziale) {
         elimina.disabled = false;
         modifica.disabled = false;
-        document.getElementById("form-elimina").action = `/admin/materie/${materiaIniziale.value}/elimina`;
+        document.getElementById("materia-da-eliminare").value = materiaIniziale.value;
         modifica.dataset.materia = materiaIniziale.value;
     }
     aggiornaAggiunta();

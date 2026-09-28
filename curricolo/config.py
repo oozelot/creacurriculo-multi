@@ -15,8 +15,12 @@ CARTELLA_DATI = RADICE / "dati"
 FILE_DB = CARTELLA_DATI / "curricolo.db"
 FILE_DB_MASTER = RISORSE / "curricolobak.db"
 FILE_DB_MASTER_ALTERNATIVO = RADICE / "curricolobak.db"
-FILE_DB_FACTORY = RADICE / "curricolobak-modificato.db"
-FILE_DB_FACTORY_ALTERNATIVO = RISORSE / "curricolobak-modificato.db"
+FILE_DB_ADMIN = RADICE / "curricolobak-modificato.db"
+FILE_DB_ADMIN_ALTERNATIVO = RISORSE / "curricolobak-modificato.db"
+
+# Nomi legacy mantenuti per compatibilita' con versioni precedenti.
+FILE_DB_FACTORY = FILE_DB_ADMIN
+FILE_DB_FACTORY_ALTERNATIVO = FILE_DB_ADMIN_ALTERNATIVO
 
 CARTELLA_ADMIN = RADICE / "ADMIN"
 CARTELLA_RICEVUTI = CARTELLA_ADMIN / "file_ricevuti"

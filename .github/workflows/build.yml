@@ -44,6 +44,9 @@ jobs:
         python -m PyInstaller --clean --noconfirm CreaCurricolo.spec
         python -m compileall -q main.py curricolo
 
+    - name: Prepara gli archivi iniziali della distribuzione
+      run: python tools/prepara_dist.py dist/CreaCurricoloMulti
+
     - name: Verifica pacchetto prodotto
       run: |
         test -f "dist/CreaCurricoloMulti/CreaCurricoloMulti${{ runner.os == 'Windows' && '.exe' || '' }}"

@@ -53,6 +53,120 @@ def _corsi_piano(corso: str) -> tuple[str, ...]:
     return (corso,) if corso != "COMUNE" else ("CAT", "GRAFICO", "AGRARIO")
 
 
+def contesti_per_percorsi(
+    classe: str, percorsi: list[tuple[str, str]]
+) -> list[tuple[str, str, str]]:
+    """Contesti EC interessati dai percorsi scolastici di una materia."""
+    corsi = set()
+    articolazioni = set()
+    for classe_percorso, indirizzo in percorsi:
+        if classe_percorso != classe:
+            continue
+        if indirizzo == "COMUNE":
+            corsi.update(("CAT", "GRAFICO"))
+            if classe in ("PRIMA", "SECONDA"):
+                corsi.add("AGRARIO")
+        elif indirizzo == "CAT":
+            corsi.add("CAT")
+        elif indirizzo == "GRAFICO":
+            corsi.add("GRAFICO")
+        elif indirizzo == "AGRARIO (tutte le articolazioni)":
+            corsi.add("AGRARIO")
+            articolazioni.add("COMUNE")
+        elif indirizzo == "AGRARIO (p.t.)":
+            corsi.add("AGRARIO")
+            articolazioni.add("PT")
+        elif indirizzo == "AGRARIO (g.a.t.)":
+            corsi.add("AGRARIO")
+            articolazioni.add("GAT")
+        elif indirizzo == "AGRARIO (eno)":
+            corsi.add("AGRARIO")
+            articolazioni.add("ENO")
+    risultati = []
+    for corso in ("CAT", "GRAFICO", "AGRARIO"):
+        if corso not in corsi:
+            continue
+        if corso != "AGRARIO" or classe in ("PRIMA", "SECONDA"):
+            risultati.append((corso, classe, "COMUNE"))
+        else:
+            specifiche = articolazioni.intersection(ARTICOLAZIONI_AGRARIO)
+            if "COMUNE" in articolazioni or not specifiche:
+                risultati.append((corso, classe, "COMUNE"))
+            risultati.extend(
+                (corso, classe, articolazione)
+                for articolazione in ARTICOLAZIONI_AGRARIO
+                if articolazione in specifiche
+            )
+    return risultati
+
+
+def materia_compatibile_con_contesto(
+    percorsi: list[tuple[str, str]], corso: str, classe: str, articolazione: str
+) -> bool:
+    """Verifica che una materia sia insegnata nel contesto di Educazione civica."""
+    indirizzi = {indirizzo for classe_percorso, indirizzo in percorsi if classe_percorso == classe}
+    if corso == "CAT":
+        return bool(indirizzi.intersection({"COMUNE", "CAT"}))
+    if corso == "GRAFICO":
+        return bool(indirizzi.intersection({"COMUNE", "GRAFICO"}))
+    if corso != "AGRARIO":
+        return False
+    comune_agrario = "AGRARIO (tutte le articolazioni)" in indirizzi
+    specifiche = {
+        articolazione_indirizzo
+        for articolazione_indirizzo, sigla in (
+            ("AGRARIO (p.t.)", "PT"),
+            ("AGRARIO (g.a.t.)", "GAT"),
+            ("AGRARIO (eno)", "ENO"),
+        )
+        if articolazione_indirizzo in indirizzi
+    }
+    if classe in ("PRIMA", "SECONDA"):
+        return comune_agrario or "COMUNE" in indirizzi
+    if articolazione == "COMUNE":
+        return comune_agrario
+    indirizzo_per_articolazione = {
+        "PT": "AGRARIO (p.t.)",
+        "GAT": "AGRARIO (g.a.t.)",
+        "ENO": "AGRARIO (eno)",
+    }.get(articolazione)
+    if indirizzo_per_articolazione is None:
+        return False
+    if indirizzo_per_articolazione in specifiche:
+        return True
+    return comune_agrario and not specifiche
+
+
+def piani_materia_nei_contesti(
+    disciplina: str, contesti: list[tuple[str, str, str]]
+) -> list[dict[str, Any]]:
+    """Restituisce i piani civici della materia nei soli contesti interessati."""
+    if not contesti:
+        return []
+    from .catalogo import nome_disciplina_visualizzato
+
+    nome = nome_disciplina_visualizzato(disciplina).casefold()
+    risultato = []
+    with connessione() as conn:
+        for corso, classe, articolazione in contesti:
+            righe = conn.execute(
+                "SELECT disciplina, dati FROM educazione_civica_piani "
+                "WHERE corso = ? AND classe = ? AND articolazione = ? ORDER BY disciplina",
+                (corso, classe, articolazione),
+            )
+            for riga in righe:
+                if nome_disciplina_visualizzato(riga["disciplina"]).casefold() != nome:
+                    continue
+                risultato.append({
+                    "corso": corso,
+                    "classe": classe,
+                    "articolazione": articolazione,
+                    "disciplina": riga["disciplina"],
+                    "dati": json.loads(riga["dati"]),
+                })
+    return risultato
+
+
 def _piano_per_docente(
     classe: str, indirizzo: str, disciplina: str
 ) -> tuple[str, dict[str, Any]] | None:

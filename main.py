@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import os
+import errno
 import json
+import os
 import shutil
+import socket
 import sys
 import threading
 import time
@@ -111,6 +113,19 @@ def periodi() -> list[str]:
     if not percorso.exists():
         return []
     return [riga.strip() for riga in percorso.read_text(encoding="cp1252", errors="replace").splitlines() if riga.strip()]
+
+
+def _porta_locale_disponibile(preferita: int, tentativi: int = 32) -> int:
+    for porta in range(preferita, preferita + tentativi):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as controllo:
+            try:
+                controllo.bind(("127.0.0.1", porta))
+            except OSError as errore:
+                if errore.errno not in (errno.EADDRINUSE, errno.EACCES):
+                    raise
+                continue
+        return porta
+    raise OSError(f"Nessuna porta locale disponibile tra {preferita} e {preferita + tentativi - 1}.")
 
 
 _sessione_inizializzata = False
@@ -251,7 +266,10 @@ def master_factory():
         svuota_file_ricevuti()
         prepara_cartelle_admin(copia_seme=False)
         session.clear()
-        flash("Master ripristinato: factory modificato e database operativo riallineati.", "info")
+        flash(
+            "Database Corrente ripristinato dal Master. L'archivio Admin e' rimasto invariato.",
+            "info",
+        )
         return redirect(url_for("step1"))
     return render_template("master_factory.html")
 
@@ -791,9 +809,10 @@ def admin_reset_pecup():
         flash("Password amministrativa non valida. Nessuna modifica applicata.", "errore")
         return redirect(request.referrer or url_for("admin_database"))
     if not db.ripristina_database_factory():
-        flash("Impossibile ripristinare l'archivio factory modificato.", "errore")
+        flash("Impossibile ripristinare lo stato Admin memorizzato.", "errore")
     else:
-        flash("Codici PECUP e situazione Educazione civica ripristinati dal factory modificato.", "info")
+        svuota_file_ricevuti()
+        flash("Stato Admin ripristinato nel database Corrente. I file INI ricevuti vanno reimportati.", "info")
     return redirect(url_for("admin_database"))
 
 
@@ -804,9 +823,9 @@ def admin_memorizza_pecup():
         flash("Password amministrativa non valida. Nessuna modifica applicata.", "errore")
         return redirect(request.referrer or url_for("admin_database"))
     if db.memorizza_pecup_factory():
-        flash("Codici PECUP memorizzati nel factory modificato.", "info")
+        flash("Materie, percorsi e catalogo dei codici PECUP memorizzati nello stato Admin.", "info")
     else:
-        flash("Impossibile aggiornare il factory modificato.", "errore")
+        flash("Impossibile aggiornare lo stato Admin memorizzato.", "errore")
     return redirect(url_for("admin_database"))
 
 
@@ -826,7 +845,11 @@ def admin_memorizza_educazione_civica():
         flash("Corso o anno scolastico non validi. Nessuna modifica applicata.", "errore")
         return redirect(request.referrer or url_for("admin_educazione_civica"))
     if db.memorizza_educazione_civica_factory(corso, classe):
-        flash(f"Situazione Educazione civica memorizzata nel factory modificato per {corso} {classe}.", "info")
+        flash(
+            f"Quadro di Educazione civica memorizzato nello stato Admin per {corso} {classe}. "
+            "Le assegnazioni dei periodi dovranno essere ricaricate dai file INI.",
+            "info",
+        )
     else:
         flash("Impossibile aggiornare il factory modificato.", "errore")
     return redirect(url_for("admin_educazione_civica", corso=corso, classe=classe))
@@ -850,6 +873,24 @@ def admin_database():
 def admin_materie():
     identificativo = request.args.get("materia", "")
     materia_selezionata = catalogo.materia(int(identificativo)) if identificativo.isdigit() else None
+    operazione = session.get("operazione_materia")
+    operazione_materia = None
+    if isinstance(operazione, dict):
+        materia_operazione = catalogo.materia(int(operazione.get("id", 0)))
+        if materia_operazione is None:
+            session.pop("operazione_materia", None)
+        else:
+            piani = _piani_operazione_materia(operazione, materia_operazione)
+            if operazione.get("fase") == "trasferisci":
+                for piano in piani:
+                    piano["destinatari"] = catalogo.materie_destinazione_educazione(
+                        int(operazione["id"]), piano
+                    )
+            operazione_materia = {
+                **operazione,
+                "materia": materia_operazione,
+                "piani": piani,
+            }
     return render_template(
         "admin_materie.html",
         sezione="materie",
@@ -857,7 +898,25 @@ def admin_materie():
         materia_selezionata=materia_selezionata,
         classi=CLASSI,
         indirizzi=INDIRIZZI,
+        operazione_materia=operazione_materia,
     )
+
+
+def _piani_operazione_materia(
+    operazione: dict[str, object], materia_selezionata: dict[str, object] | None = None
+) -> list[dict[str, object]]:
+    identificativo = int(operazione["id"])
+    materia_selezionata = materia_selezionata or catalogo.materia(identificativo)
+    if materia_selezionata is None:
+        return []
+    if operazione.get("tipo") != "percorsi":
+        return catalogo.piani_educazione_per_rimozione(identificativo)
+    percorsi_nuovi = [tuple(voce) for voce in operazione.get("percorsi_nuovi", [])]
+    percorsi_rimossi = [
+        tuple(voce) for voce in materia_selezionata["percorsi"]
+        if tuple(voce) not in percorsi_nuovi
+    ]
+    return catalogo.piani_educazione_per_rimozione(identificativo, percorsi_rimossi)
 
 
 @app.route("/admin/materie/aggiungi", methods=["POST"])
@@ -886,11 +945,118 @@ def admin_aggiungi_materia():
     return redirect(url_for("admin_materie"))
 
 
+@app.route("/admin/materie/elimina", methods=["POST"])
 @app.route("/admin/materie/<int:identificativo>/elimina", methods=["POST"])
-def admin_elimina_materia(identificativo: int):
-    if not catalogo.elimina_materia(identificativo):
+def admin_elimina_materia(identificativo: int | None = None):
+    if identificativo is None:
+        valore = request.form.get("identificativo", "")
+        if not valore.isdigit():
+            abort(400)
+        identificativo = int(valore)
+    materia_selezionata = catalogo.materia(identificativo)
+    if materia_selezionata is None:
         abort(404)
-    flash("Materia eliminata dal quadro attivo.", "info")
+    session["operazione_materia"] = {
+        "id": identificativo,
+        "tipo": "elimina",
+        "fase": "conferma",
+    }
+    return redirect(url_for("admin_materie", materia=identificativo))
+
+
+def _concludi_rimozione_materia(
+    operazione: dict[str, object], destinatari: dict[str, int] | None = None
+) -> Response:
+    identificativo = int(operazione["id"])
+    materia_selezionata = catalogo.materia(identificativo)
+    if materia_selezionata is None:
+        session.pop("operazione_materia", None)
+        abort(404)
+    percorsi_nuovi = (
+        [tuple(voce) for voce in operazione.get("percorsi_nuovi", [])]
+        if operazione.get("tipo") == "percorsi"
+        else None
+    )
+    piani = _piani_operazione_materia(operazione, materia_selezionata)
+    try:
+        if not catalogo.applica_rimozione_materia(
+            identificativo,
+            destinatari,
+            percorsi_nuovi,
+            str(operazione.get("sigla_nuova", "")),
+        ):
+            abort(404)
+    except ValueError as errore:
+        flash(str(errore), "errore")
+        operazione["fase"] = "trasferisci" if destinatari else "conferma"
+        session["operazione_materia"] = operazione
+        return redirect(url_for("admin_materie", materia=identificativo))
+    session.pop("operazione_materia", None)
+    if percorsi_nuovi is None:
+        flash("Materia eliminata dal quadro attivo.", "info")
+    else:
+        flash("Percorsi rimossi e quadro di Educazione civica aggiornato.", "info")
+    if piani:
+        primo = piani[0]
+        return redirect(url_for(
+            "admin_educazione_civica",
+            corso=primo["corso"],
+            classe=primo["classe"],
+        ))
+    if percorsi_nuovi is not None:
+        mancanti = catalogo.percorsi_pecup_mancanti_percorsi(
+            str(materia_selezionata["nome"]),
+            str(operazione.get("sigla_nuova") or materia_selezionata["sigla"]),
+            percorsi_nuovi,
+        )
+        if mancanti:
+            session["pecup_mancanti"] = mancanti
+            return redirect(url_for("admin_materie", materia=identificativo, pecup="mancanti"))
+    return redirect(url_for("admin_materie"))
+
+
+@app.route("/admin/materie/elimina/decidi", methods=["POST"])
+def admin_decidi_eliminazione_materia():
+    operazione = session.get("operazione_materia")
+    if not isinstance(operazione, dict) or operazione.get("fase") != "conferma":
+        abort(400)
+    if request.form.get("azione") == "trasferisci":
+        piani = _piani_operazione_materia(operazione)
+        if not piani:
+            flash("Non ci sono piani di Educazione civica da trasferire.", "info")
+            return _concludi_rimozione_materia(operazione)
+        operazione["fase"] = "trasferisci"
+        session["operazione_materia"] = operazione
+        return redirect(url_for("admin_materie", materia=operazione["id"]))
+    if request.form.get("azione") == "senza_trasferire":
+        return _concludi_rimozione_materia(operazione)
+    session.pop("operazione_materia", None)
+    return redirect(url_for("admin_materie"))
+
+
+@app.route("/admin/materie/elimina/memorizza", methods=["POST"])
+def admin_memorizza_rimozione_materia():
+    operazione = session.get("operazione_materia")
+    if not isinstance(operazione, dict) or operazione.get("fase") != "trasferisci":
+        abort(400)
+    identificativo = int(operazione["id"])
+    materia_selezionata = catalogo.materia(identificativo)
+    if materia_selezionata is None:
+        abort(404)
+    piani = _piani_operazione_materia(operazione, materia_selezionata)
+    destinatari = {}
+    for piano in piani:
+        valore = request.form.get(f"destinatario_{piano['indice']}", "")
+        if not valore.isdigit():
+            flash("Scegliere una materia destinataria per ogni contesto.", "errore")
+            return redirect(url_for("admin_materie", materia=identificativo))
+        destinatari[str(piano["indice"])] = int(valore)
+    return _concludi_rimozione_materia(operazione, destinatari)
+
+
+@app.route("/admin/materie/elimina/esci", methods=["POST"])
+def admin_esci_rimozione_materia():
+    session.pop("operazione_materia", None)
     return redirect(url_for("admin_materie"))
 
 
@@ -918,12 +1084,41 @@ def admin_modifica_materia(identificativo: int):
     if sigla and sigla != str(materia_selezionata["sigla"]).upper() and catalogo.sigla_tecnica_in_uso(sigla, identificativo):
         flash("Sigla già in uso da un'altra materia.", "errore")
         return redirect(url_for("admin_materie", materia=identificativo))
+    mancanti = catalogo.percorsi_pecup_mancanti_percorsi(
+        str(materia_selezionata["nome"]), sigla or str(materia_selezionata["sigla"]), percorsi
+    )
+    percorsi_rimossi = [
+        tuple(voce) for voce in materia_selezionata["percorsi"]
+        if tuple(voce) not in percorsi
+    ]
+    piani_da_rimuovere = catalogo.piani_educazione_per_rimozione(
+        identificativo, percorsi_rimossi
+    )
+    if percorsi_rimossi:
+        if piani_da_rimuovere:
+            session["operazione_materia"] = {
+                "id": identificativo,
+                "tipo": "percorsi",
+                "fase": "conferma",
+                "percorsi_nuovi": percorsi,
+                "sigla_nuova": sigla if sigla != str(materia_selezionata["sigla"]).upper() else "",
+            }
+            return redirect(url_for("admin_materie", materia=identificativo))
+        if not catalogo.applica_rimozione_materia(
+            identificativo,
+            {},
+            percorsi,
+            sigla if sigla != str(materia_selezionata["sigla"]).upper() else "",
+        ):
+            abort(404)
+        if mancanti:
+            session["pecup_mancanti"] = mancanti
+            return redirect(url_for("admin_materie", materia=identificativo, pecup="mancanti"))
+        flash("Percorsi della materia aggiornati.", "info")
+        return redirect(url_for("admin_materie"))
     if sigla and sigla != str(materia_selezionata["sigla"]).upper() and not catalogo.aggiorna_sigla_materia(identificativo, sigla):
         flash("Impossibile aggiornare la sigla tecnica.", "errore")
         return redirect(url_for("admin_materie", materia=identificativo))
-    mancanti = catalogo.percorsi_pecup_mancanti_percorsi(
-        str(materia_selezionata["nome"]), str(materia_selezionata["sigla"]), percorsi
-    )
     if mancanti:
         session["bozza_materia"] = {"id": identificativo, "percorsi": percorsi}
         session["pecup_mancanti"] = mancanti
@@ -965,9 +1160,12 @@ def admin_pecup_materia(identificativo: int):
     if materia_selezionata is None:
         abort(404)
     classi_mancanti = catalogo.classi_pecup_mancanti(identificativo)
+    classi_materia = list(dict.fromkeys(classe for classe, _ in materia_selezionata["percorsi"]))
     classe = request.values.get("classe", "")
-    if classe not in classi_mancanti:
-        classe = classi_mancanti[0] if classi_mancanti else ""
+    if classe not in classi_materia:
+        classe = classi_mancanti[0] if classi_mancanti else (
+            classi_materia[0] if classi_materia else ""
+        )
     fonti = [int(valore) for valore in request.values.getlist("fonte") if valore.isdigit()]
     anni = [anno for anno in request.values.getlist("anno") if anno in CLASSI]
     if request.method == "POST":
@@ -984,7 +1182,7 @@ def admin_pecup_materia(identificativo: int):
                 for testo in request.form.get(f"{tipo}_personalizzato", "").splitlines()
                 if testo.strip()
             ]
-            for tipo in ("abilita", "conoscenza", "competencia")
+            for tipo in ("abilita", "conoscenza", "competenza")
         }
         try:
             catalogo.salva_pecup(identificativo, classe, selezioni)
@@ -993,16 +1191,26 @@ def admin_pecup_materia(identificativo: int):
             flash(str(errore), "errore")
         else:
             successive = catalogo.classi_pecup_mancanti(identificativo)
-            if successive:
-                flash(f"Codici PECUP salvati per {classe}. Completare ora {successive[0]}.", "info")
-                return redirect(url_for("admin_pecup_materia", identificativo=identificativo, classe=successive[0]))
-            session.pop("pecup_mancanti", None)
-            flash("Codici PECUP creati e associati alla materia.", "info")
-            return redirect(url_for("admin_materie"))
+            if not successive:
+                session.pop("pecup_mancanti", None)
+            classe_successiva = next(
+                (voce for voce in classi_materia if voce in successive),
+                classe,
+            )
+            session["pecup_salvato"] = True
+            return redirect(url_for(
+                "admin_pecup_materia",
+                identificativo=identificativo,
+                classe=classe_successiva,
+                fonte=fonti,
+                anno=anni,
+            ))
+    salvato = bool(session.pop("pecup_salvato", False)) if request.method == "GET" else False
     return render_template(
         "admin_pecup.html", sezione="materie", materia=materia_selezionata,
         mancanti=session.get("pecup_mancanti", catalogo.percorsi_pecup_mancanti(identificativo)),
-        classe=classe, classi_mancanti=classi_mancanti, fonti=fonti, anni=anni,
+        classe=classe, classi_mancanti=classi_mancanti, classi_materia=classi_materia,
+        fonti=fonti, anni=anni, salvato=salvato,
         materie_fonti=[voce for voce in catalogo.materie() if voce["id"] != identificativo],
         abilita=catalogo.testi_pecup_da_fonti("abilita", fonti, anni),
         conoscenze=catalogo.testi_pecup_da_fonti("conoscenza", fonti, anni),
@@ -1619,7 +1827,7 @@ def admin_apri():
 if __name__ == "__main__":
     prepara_cartelle_admin()
     eseguibile = getattr(sys, "frozen", False)
-    porta = 5001 if eseguibile else 5000
+    porta = _porta_locale_disponibile(5001 if eseguibile else 5000)
     if eseguibile:
         threading.Thread(target=controlla_heartbeat, daemon=True).start()
         threading.Timer(1.0, lambda: webbrowser.open(f"http://127.0.0.1:{porta}")).start()

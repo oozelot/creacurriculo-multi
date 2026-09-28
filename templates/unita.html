@@ -895,13 +895,6 @@
         return String(codice || "").trim().toUpperCase();
     }
 
-    function chiaveMateria(nome) {
-        return String(nome || "")
-            .toUpperCase()
-            .split("(")[0]
-            .replace(/[^A-Z0-9]/g, "");
-    }
-
     function limiteFacilitata() {
         return tipoFacilitata === "competenza" ? 5 : 9;
     }
@@ -916,13 +909,12 @@
         const materie = valoriFiltro("materia");
         const indirizzi = valoriFiltro("indirizzo");
         const classi = valoriFiltro("classe");
-        const materieVoce = (voce.materie || []).map(chiaveMateria);
         const sicurezzaSelezionata = materie.includes("__SICUREZZA_BIENNIO__");
         const voceSicurezza = sicurezzaSelezionata
             && (sicurezzaBiennio[tipoFacilitata] || []).some(sicurezza => sicurezza.codice === voce.codice);
         const materiaSelezionata = materie
             .filter(materia => materia !== "__SICUREZZA_BIENNIO__")
-            .some(materia => materieVoce.includes(materia));
+            .some(sigla => codicePulito(voce.codice).slice(0, 3) === sigla);
         const classiVoce = (voce.classi || []).map(String);
         const classiSelezionate = classi.flatMap(classe => {
             if (classe === "BIE") return ["1", "2"];
@@ -946,33 +938,24 @@
             && (!classi.length || classiSelezionate.some(classe => classiVoce.includes(classe)));
     }
 
-    function etichettaClasse(classi) {
-        const valori = [...new Set((classi || []).map(String))].sort();
-        if (valori.join(",") === "1,2") return "BIE";
-        if (valori.join(",") === "3,4") return "34-";
-        if (valori.join(",") === "3,4,5") return "345";
-        if (valori.join(",") === "5") return "005";
-        return valori.join("/") || "-";
-    }
-
-    function etichettaArticolazione(articolazione) {
-        return {
-            "T": "COM",
-            "G": "GRA",
-            "C": "CAT",
-            "A": "AGR",
-            "p": "PT",
-            "e": "ENO",
-            "g": "GAT"
-        }[articolazione] || "";
-    }
-
     function etichettaMateria(voce) {
-        const materie = voce.materie || [];
-        if (materie.length) {
-            return materie.join(" / ");
+        const filtriSelezionati = valoriFiltro("materia");
+        const sicurezzaSelezionata = filtriSelezionati.includes("__SICUREZZA_BIENNIO__")
+            && (sicurezzaBiennio[tipoFacilitata] || []).some(sicurezza => sicurezza.codice === voce.codice);
+        if (sicurezzaSelezionata) {
+            return "Sicurezza biennio";
         }
-        return "Sicurezza";
+
+        const siglaCodice = codicePulito(voce.codice).slice(0, 3);
+        const materiaSelezionata = materieFiltro.find(materia =>
+            filtriSelezionati.includes(codicePulito(materia.sigla))
+            && siglaCodice === codicePulito(materia.sigla)
+        );
+        if (materiaSelezionata) {
+            return materiaSelezionata.nome;
+        }
+
+        return (voce.materie || []).join(" / ") || "Sicurezza biennio";
     }
 
     function mostraAvviso(testo) {
@@ -1036,8 +1019,7 @@
             });
             const riferimento = document.createElement("div");
             riferimento.className = "codice-facilitata";
-            const articolazione = etichettaArticolazione(voce.articolazione);
-            riferimento.textContent = `${etichettaMateria(voce)} · ${etichettaClasse(voce.classi)}${articolazione ? ` · ${articolazione}` : ""}`;
+            riferimento.textContent = etichettaMateria(voce);
             riferimento.title = `${voce.codice} - ${riferimento.textContent}`;
             const testo = document.createElement("div");
             testo.className = "testo-facilitata";
@@ -1065,7 +1047,7 @@
             const check = document.createElement("input");
             check.type = "checkbox";
             check.dataset.filtro = "materia";
-            check.value = chiaveMateria(materia.nome);
+            check.value = codicePulito(materia.sigla);
             check.addEventListener("change", aggiornaListaFacilitata);
             label.append(check, ` ${materia.nome}`);
             contenitore.appendChild(label);

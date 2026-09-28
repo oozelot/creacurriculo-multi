@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 from . import db
@@ -342,6 +343,279 @@ def salva_pecup(identificativo: int, classe_destinazione: str, selezioni: dict[s
     return True
 
 
+def piani_educazione_per_rimozione(
+    identificativo: int, percorsi_rimossi: list[tuple[str, str]] | None = None
+) -> list[dict[str, object]]:
+    """Piani civici che saranno interessati dall'eliminazione della materia o dei percorsi."""
+    materia_selezionata = materia(identificativo)
+    if materia_selezionata is None:
+        return []
+    from . import educazione_civica
+
+    with connessione() as conn:
+        varianti = conn.execute(
+            "SELECT id, nome FROM discipline WHERE sigla = ? ORDER BY id",
+            (materia_selezionata["sigla"],),
+        ).fetchall()
+        percorsi_per_id = {}
+        for variante in varianti:
+            percorsi_per_id[int(variante["id"])] = [
+                (riga["classe"], riga["indirizzo"])
+                for riga in conn.execute(
+                    """
+                    SELECT c.nome AS classe, i.nome AS indirizzo
+                      FROM offerta_formativa o
+                      JOIN classi c ON c.numero = o.classe
+                      JOIN indirizzi i ON i.id = o.indirizzo_id
+                     WHERE o.disciplina_id = ?
+                    """,
+                    (variante["id"],),
+                )
+            ]
+    piani = []
+    for variante in varianti:
+        percorsi = percorsi_per_id[int(variante["id"])]
+        if percorsi_rimossi is not None:
+            percorsi = [percorso for percorso in percorsi if percorso in percorsi_rimossi]
+        contesti = []
+        for classe in classi():
+            contesti.extend(educazione_civica.contesti_per_percorsi(classe, percorsi))
+        piani.extend(
+            educazione_civica.piani_materia_nei_contesti(str(variante["nome"]), contesti)
+        )
+    return [
+        {"indice": indice, **piano}
+        for indice, piano in enumerate(
+            sorted(piani, key=lambda piano: (
+                classi().index(str(piano["classe"])),
+                ("CAT", "GRAFICO", "AGRARIO").index(str(piano["corso"])),
+                ("COMUNE", "PT", "GAT", "ENO").index(str(piano["articolazione"])),
+                str(piano["disciplina"]).casefold(),
+            ))
+        )
+    ]
+
+
+def materie_destinazione_educazione(
+    identificativo_escluso: int,
+    piano: dict[str, object],
+    percorsi_disponibili: list[tuple[str, str]] | None = None,
+) -> list[dict[str, object]]:
+    """Materie attive compatibili con il contesto del piano civico."""
+    from . import educazione_civica
+
+    risultato = []
+    for voce in materie():
+        if int(voce["id"]) == identificativo_escluso:
+            continue
+        percorsi = (
+            percorsi_disponibili
+            if int(voce["id"]) == identificativo_escluso and percorsi_disponibili is not None
+            else voce["percorsi"]
+        )
+        if educazione_civica.materia_compatibile_con_contesto(
+            list(percorsi), str(piano["corso"]), str(piano["classe"]), str(piano["articolazione"])
+        ):
+            risultato.append(voce)
+    return risultato
+
+
+def applica_rimozione_materia(
+    identificativo: int,
+    destinatari: dict[str, int] | None = None,
+    percorsi_nuovi: list[tuple[str, str]] | None = None,
+    sigla_nuova: str = "",
+) -> bool:
+    """Rimuove una materia o alcuni percorsi e i relativi piani civici in modo atomico."""
+    materia_selezionata = materia(identificativo)
+    if materia_selezionata is None:
+        return False
+    percorsi_attuali = list(materia_selezionata["percorsi"])  # type: ignore[arg-type]
+    rimozione_totale = percorsi_nuovi is None
+    percorsi_destinazione = [] if rimozione_totale else list(dict.fromkeys(percorsi_nuovi))
+    if not rimozione_totale and not percorsi_destinazione:
+        raise ValueError("Una materia deve mantenere almeno un percorso.")
+    rimossi = percorsi_attuali if rimozione_totale else [
+        percorso for percorso in percorsi_attuali if percorso not in percorsi_destinazione
+    ]
+    piani = piani_educazione_per_rimozione(identificativo, rimossi)
+    destinatari = destinatari or {}
+    if destinatari and set(destinatari) != {str(piano["indice"]) for piano in piani}:
+        raise ValueError("Selezionare una materia destinataria per ogni contesto interessato.")
+    if not destinatari and piani:
+        pass
+
+    from . import educazione_civica
+
+    with connessione() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        for piano in piani:
+            indice = str(piano["indice"])
+            destinazione_id = destinatari.get(indice)
+            if destinazione_id is not None:
+                destinazione = conn.execute(
+                    "SELECT id, nome FROM discipline WHERE id = ?", (destinazione_id,)
+                ).fetchone()
+                if destinazione is None or destinazione_id == identificativo:
+                    raise ValueError("Materia destinataria non valida.")
+                percorsi_target = [
+                    (riga["classe"], riga["indirizzo"])
+                    for riga in conn.execute(
+                        """
+                        SELECT c.nome AS classe, i.nome AS indirizzo
+                          FROM offerta_formativa o
+                          JOIN classi c ON c.numero = o.classe
+                          JOIN indirizzi i ON i.id = o.indirizzo_id
+                         WHERE o.disciplina_id = ?
+                        """,
+                        (destinazione_id,),
+                    )
+                ]
+                if not educazione_civica.materia_compatibile_con_contesto(
+                    percorsi_target, str(piano["corso"]), str(piano["classe"]),
+                    str(piano["articolazione"]),
+                ):
+                    raise ValueError("La materia destinataria non appartiene al contesto selezionato.")
+                piano_esistente = conn.execute(
+                    """
+                    SELECT dati FROM educazione_civica_piani
+                     WHERE corso = ? AND classe = ? AND articolazione = ?
+                       AND upper(trim(disciplina)) = upper(trim(?))
+                    """,
+                    (
+                        piano["corso"], piano["classe"], piano["articolazione"],
+                        destinazione["nome"],
+                    ),
+                ).fetchone()
+                dati_destinazione = (
+                    json.loads(piano_esistente["dati"]) if piano_esistente else {}
+                )
+                voci = {}
+                for voce in [*(dati_destinazione.get("voci") or []), *(piano["dati"].get("voci") or [])]:  # type: ignore[union-attr]
+                    chiave = (
+                        str(voce.get("macroarea", "")),
+                        " ".join(str(voce.get("voce", "")).split()),
+                    )
+                    if not chiave[1]:
+                        continue
+                    voci[chiave] = voci.get(chiave, 0) + int(voce.get("ore", 0) or 0)
+                dati_destinazione.update({
+                    "voci": [
+                        {"macroarea": macroarea, "voce": voce, "ore": ore}
+                        for (macroarea, voce), ore in voci.items()
+                        if ore > 0
+                    ],
+                    "ore_disciplina": sum(voci.values()),
+                    "conferme": {},
+                })
+                conn.execute(
+                    """
+                    INSERT INTO educazione_civica_piani
+                        (corso, classe, articolazione, disciplina, dati)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(corso, classe, articolazione, disciplina) DO UPDATE SET
+                        dati = excluded.dati,
+                        aggiornato_il = datetime('now', 'localtime')
+                    """,
+                    (
+                        piano["corso"], piano["classe"], piano["articolazione"],
+                        destinazione["nome"], json.dumps(dati_destinazione, ensure_ascii=False),
+                    ),
+                )
+            conn.execute(
+                "DELETE FROM educazione_civica_piani "
+                "WHERE corso = ? AND classe = ? AND articolazione = ? "
+                "AND upper(trim(disciplina)) = upper(trim(?))",
+                (piano["corso"], piano["classe"], piano["articolazione"], piano["disciplina"]),
+            )
+
+        sigla = str(materia_selezionata["sigla"])
+        nomi_materia = [
+            str(riga["nome"])
+            for riga in conn.execute("SELECT nome FROM discipline WHERE sigla = ?", (sigla,))
+        ]
+        for classe, indirizzo in rimossi:
+            numero = conn.execute("SELECT numero FROM classi WHERE nome = ?", (classe,)).fetchone()
+            percorso_indirizzo = conn.execute(
+                "SELECT id FROM indirizzi WHERE nome = ?", (indirizzo,)
+            ).fetchone()
+            if numero and percorso_indirizzo:
+                for nome in nomi_materia:
+                    conn.execute(
+                        "DELETE FROM pecup_validita WHERE upper(trim(disciplina)) = upper(trim(?)) "
+                        "AND classe = ? AND indirizzo_id = ?",
+                        (nome, numero["numero"], percorso_indirizzo["id"]),
+                    )
+        identificativi = [
+            int(riga["id"])
+            for riga in conn.execute("SELECT id FROM discipline WHERE sigla = ?", (sigla,))
+        ]
+        if rimozione_totale:
+            conn.executemany(
+                "DELETE FROM offerta_formativa WHERE disciplina_id = ?",
+                [(voce,) for voce in identificativi],
+            )
+            for nome in nomi_materia:
+                conn.execute(
+                    "DELETE FROM pecup_validita WHERE upper(trim(disciplina)) = upper(trim(?))",
+                    (nome,),
+                )
+            conn.execute("DELETE FROM discipline WHERE sigla = ?", (sigla,))
+        else:
+            identificativo_riga = conn.execute(
+                "SELECT id FROM discipline WHERE id = ?", (identificativo,)
+            ).fetchone()
+            if identificativo_riga is None:
+                return False
+            indirizzi = {
+                riga["nome"]: int(riga["id"])
+                for riga in conn.execute("SELECT id, nome FROM indirizzi")
+            }
+            classi_numeri = {
+                riga["nome"]: int(riga["numero"])
+                for riga in conn.execute("SELECT numero, nome FROM classi")
+            }
+            nuovi_id = {
+                (classi_numeri[classe], indirizzi[indirizzo])
+                for classe, indirizzo in percorsi_destinazione
+                if classe in classi_numeri and indirizzo in indirizzi
+            }
+            ids = [
+                int(riga["id"])
+                for riga in conn.execute(
+                    "SELECT id FROM discipline WHERE sigla = ? ORDER BY id",
+                    (str(materia_selezionata["sigla"]),),
+                )
+            ]
+            segnaposto = ",".join("?" for _ in ids)
+            esistenti = {
+                (riga["classe"], riga["indirizzo_id"]): int(riga["disciplina_id"])
+                for riga in conn.execute(
+                    f"SELECT disciplina_id, classe, indirizzo_id FROM offerta_formativa "
+                    f"WHERE disciplina_id IN ({segnaposto})",
+                    ids,
+                )
+            }
+            conn.execute(
+                f"DELETE FROM offerta_formativa WHERE disciplina_id IN ({segnaposto})",
+                ids,
+            )
+            conn.executemany(
+                "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (?, ?, ?)",
+                [
+                    (esistenti.get((classe_numero, indirizzo_id), ids[0]), indirizzo_id, classe_numero)
+                    for classe_numero, indirizzo_id in sorted(nuovi_id)
+                ],
+            )
+            if sigla_nuova:
+                conn.execute(
+                    "UPDATE discipline SET sigla = ?, sigla_ini = ? WHERE id = ?",
+                    (sigla_nuova.upper(), db.sigla_ini_da_nome(str(materia_selezionata["nome"])), identificativo),
+                )
+        conn.commit()
+    return True
+
+
 def aggiungi_materia(nome: str, sigla: str, percorsi: list[tuple[str, str]]) -> int:
     """Inserisce una materia e tutti i suoi abbinamenti classe/indirizzo."""
     with connessione() as conn:
@@ -370,17 +644,7 @@ def aggiungi_materia(nome: str, sigla: str, percorsi: list[tuple[str, str]]) -> 
 
 def elimina_materia(identificativo: int) -> bool:
     """Elimina materia e abbinamenti, preservando record ricevuti gia' storicizzati."""
-    with connessione() as conn:
-        riga = conn.execute("SELECT sigla FROM discipline WHERE id = ?", (identificativo,)).fetchone()
-        if riga is None:
-            return False
-        conn.execute(
-            "DELETE FROM offerta_formativa WHERE disciplina_id IN (SELECT id FROM discipline WHERE sigla = ?)",
-            (riga["sigla"],),
-        )
-        eliminata = conn.execute("DELETE FROM discipline WHERE sigla = ?", (riga["sigla"],)).rowcount
-        conn.commit()
-    return eliminata > 0
+    return applica_rimozione_materia(identificativo)
 
 
 def sigla_indirizzo(nome: str) -> str:
@@ -519,22 +783,20 @@ def codici_pecup_materie(tipo: str) -> list[dict[str, object]]:
 
 
 def codici_sicurezza_biennio(tipo: str) -> list[dict[str, object]]:
-        """Voci di sicurezza del biennio per le quattro discipline propedeutiche."""
-        discipline = {"DIRITTO ED ECONOMIA", "CHIMICA", "FISICA", "INFORMATICA"}
-        with connessione() as conn:
-                righe = conn.execute(
-                        """
-                        SELECT DISTINCT p.codice, p.descrizione
-                            FROM pecup p
-                            JOIN pecup_validita v ON v.pecup_id = p.id
-                         WHERE p.tipo = ?
-                             AND v.classe IN (1, 2)
-                             AND upper(v.disciplina) IN (?, ?, ?, ?)
-                             AND upper(p.descrizione) LIKE '%SICUREZZA%'
-                         ORDER BY p.codice
-                        """,
-                        (tipo, *sorted(discipline)),
-                ).fetchall()
+    """Voci con sigla SIC valide per il biennio."""
+    with connessione() as conn:
+        righe = conn.execute(
+            """
+            SELECT DISTINCT p.codice, p.descrizione
+              FROM pecup p
+              JOIN pecup_validita v ON v.pecup_id = p.id
+             WHERE p.tipo = ?
+               AND v.classe IN (1, 2)
+               AND upper(p.codice) LIKE 'SIC%'
+             ORDER BY p.codice
+            """,
+            (tipo,),
+        ).fetchall()
         return [
             {
                 "codice": r["codice"],

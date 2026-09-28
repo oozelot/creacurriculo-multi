@@ -3,14 +3,14 @@
 {% block contenuto %}
 <fieldset>
     <legend>Gestione codici PECUP: {{ materia.nome }}</legend>
-    <p class="nota">Completare una classe alla volta. La classe proposta e' la prima che non ha ancora tutti i codici PECUP.</p>
+    <p class="nota">Completare una classe alla volta. La classe proposta e' la prima che non ha ancora tutti i codici PECUP; dopo il completamento e' possibile selezionare qualsiasi classe.</p>
 
     <form method="get" class="scelta-fonti">
         <fieldset>
             <legend>1. Scegli classe, materie e anni sorgente</legend>
             <label for="classe">Classe da completare</label>
             <select id="classe" name="classe">
-                {% for voce in classi_mancanti %}<option value="{{ voce }}" {{ 'selected' if voce == classe }}>{{ voce }}</option>{% endfor %}
+                {% for voce in classi_materia %}<option value="{{ voce }}" {{ 'selected' if voce == classe }}>{{ voce }}</option>{% endfor %}
             </select>
             <div class="fonti-colonne">
                 <div><strong>Materie configurate da cui acquisire i testi</strong>
@@ -25,8 +25,9 @@
                 </div>
             </div>
             <div class="barra barra-azioni">
+                <input type="hidden" id="carica-testi-flag" name="carica" value="">
                 <button type="submit" id="carica-testi" disabled>Carica testi</button>
-                <a class="bottone" href="{{ url_for('admin_materie') }}" data-attesa>Annulla</a>
+                <a class="bottone" href="{{ url_for('admin_materie') }}" data-attesa>Annulla/Indietro</a>
                 {% if fonti and anni and (abilita or conoscenze or competenze) %}
                 <button type="submit" id="salva-pecup" form="form-pecup" hidden disabled>Salva codici PECUP per {{ classe }}</button>
                 {% endif %}
@@ -34,7 +35,7 @@
         </fieldset>
     </form>
 
-    {% if fonti and anni %}
+    {% if fonti and anni and request.args.get('carica') == '1' %}
     <form method="post" id="form-pecup">
         <input type="hidden" name="classe" value="{{ classe }}">
         {% for fonte in fonti %}<input type="hidden" name="fonte" value="{{ fonte }}">{% endfor %}
@@ -59,7 +60,18 @@
     </form>
     {% endif %}
 </fieldset>
+{% if salvato %}
+<div class="velo" id="popup-pecup-salvato" role="alertdialog" aria-modal="true" aria-labelledby="titolo-pecup-salvato">
+    <div class="popup">
+        <strong id="titolo-pecup-salvato">Codici salvati</strong>
+        <p>I codici PECUP sono stati salvati. Puoi continuare a selezionare una classe e i relativi codici.</p>
+        <button type="button" id="chiudi-popup-pecup">OK</button>
+    </div>
+</div>
+{% endif %}
 <style>
+    .velo { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .25); z-index: 100; }
+    .popup { max-width: 430px; padding: 16px; border: 2px solid #000; background: #fff; font-size: 12px; }
     .scelta-fonti select { width: 180px; }
     .fonti-colonne, .pecup-griglie { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; align-items: start; }
     .pecup-griglie { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -91,7 +103,16 @@
 </style>
 <script>
     const formFonti = document.querySelector('.scelta-fonti');
+    const popupSalvato = document.getElementById('popup-pecup-salvato');
+    const chiudiPopup = document.getElementById('chiudi-popup-pecup');
+    if (popupSalvato && chiudiPopup) {
+        chiudiPopup.addEventListener('click', () => popupSalvato.remove());
+    }
     const carica = document.getElementById('carica-testi');
+    const caricaFlag = document.getElementById('carica-testi-flag');
+    carica.addEventListener('click', () => {
+        caricaFlag.value = '1';
+    });
     const salva = document.getElementById('salva-pecup');
     if (salva) {
         salva.hidden = true;
@@ -104,6 +125,17 @@
     formFonti.querySelectorAll('input').forEach(campo => campo.addEventListener('change', aggiornaFonti));
     aggiornaFonti();
     const formPecup = document.getElementById('form-pecup');
+    if (formPecup) {
+        formPecup.querySelectorAll('.seleziona-tutto').forEach(pulsante => {
+            pulsante.addEventListener('click', () => {
+                const tipo = pulsante.dataset.tipo;
+                formPecup.querySelectorAll(`input[name="${tipo}"]`).forEach(campo => {
+                    campo.checked = true;
+                    campo.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            });
+        });
+    }
     if (formPecup && salva) {
         function attivaPersonalizzati(tipo) {
             const campi = Array.from(formPecup.querySelectorAll(`input[name^="${tipo}_personalizzato_"]`));
