@@ -2,7 +2,7 @@ name: Compila Multi-Piattaforma
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, 'copilot/educazione-civica-2026-09-29' ]
     tags: [ 'v*' ]
   pull_request:
   workflow_dispatch:
