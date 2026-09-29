@@ -494,7 +494,7 @@ def memorizza_pecup_factory() -> bool:
 
 
 def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
-    """Memorizza il quadro civico del contesto, senza dati di conferma provenienti dagli INI."""
+    """Memorizza il quadro civico e il relativo snapshot nello stato Admin."""
     archivio_admin = _inizializza_archivio_admin()
     if archivio_admin is None:
         return False
@@ -502,6 +502,7 @@ def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
     destinazione = sqlite3.connect(archivio_admin)
     try:
         origine.row_factory = sqlite3.Row
+        destinazione.execute("BEGIN IMMEDIATE")
         destinazione.execute(
             "DELETE FROM educazione_civica_piani WHERE corso = ? AND classe = ?",
             (corso, classe),
@@ -516,15 +517,43 @@ def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
             if not isinstance(dati, dict):
                 raise ValueError("Formato non valido nel piano di Educazione civica.")
             dati["conferme"] = {}
+            contenuto = json.dumps(dati, ensure_ascii=False)
             piani.append(
-                (corso, classe, riga["articolazione"], riga["disciplina"], json.dumps(dati, ensure_ascii=False))
+                (corso, classe, riga["articolazione"], riga["disciplina"], contenuto)
             )
         destinazione.executemany(
             "INSERT INTO educazione_civica_piani "
             "(corso, classe, articolazione, disciplina, dati) VALUES (?, ?, ?, ?, ?)",
             piani,
         )
+        destinazione.execute(
+            """
+            INSERT INTO educazione_civica_backup (corso, classe, dump, aggiornato_il)
+            VALUES (?, ?, ?, datetime('now', 'localtime'))
+            ON CONFLICT(corso, classe) DO UPDATE SET
+                dump = excluded.dump,
+                aggiornato_il = excluded.aggiornato_il
+            """,
+            (
+                corso,
+                classe,
+                json.dumps(
+                    [
+                        {
+                            "articolazione": articolazione,
+                            "disciplina": disciplina,
+                            "dati": dati,
+                        }
+                        for _, _, articolazione, disciplina, dati in piani
+                    ],
+                    ensure_ascii=False,
+                ),
+            ),
+        )
         destinazione.commit()
+    except Exception:
+        destinazione.rollback()
+        raise
     finally:
         origine.close()
         destinazione.close()

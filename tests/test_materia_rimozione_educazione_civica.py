@@ -26,6 +26,10 @@ def _prepara_db(monkeypatch, tmp_path):
                 (7, "AGRARIO (eno)", "ENO", 7),
             ],
         )
+        conn.execute(
+            "INSERT INTO educazione_civica_catalogo (macroarea, voce, posizione) "
+            "VALUES ('COSTITUZIONE', 'LEGALITA', 1)"
+        )
         conn.executemany(
             "INSERT INTO discipline (id, nome, sigla, sigla_ini, attende_ini) VALUES (?, ?, ?, ?, 0)",
             [(1, "MATERIA DA ELIMINARE", "MDE", "MATER"), (2, "MATERIA DESTINATARIA", "MDT", "MATER")],
@@ -112,6 +116,174 @@ def test_trasferimento_materia_somma_ore_e_azzera_conferme(monkeypatch, tmp_path
     assert dati["voci"][0]["ore"] == 9
     assert dati["ore_disciplina"] == 9
     assert dati["conferme"] == {}
+    completamento_cat = next(
+        voce for voce in main._calcola_completamento() if voce["corso"] == "CAT"
+    )
+    assert completamento_cat["ore"][0] == 9
+
+
+def test_completamento_ignora_piano_di_materia_non_piu_attiva(monkeypatch, tmp_path):
+    percorso = _prepara_db(monkeypatch, tmp_path)
+    with db.connessione() as conn:
+        conn.execute(
+            "UPDATE discipline SET nome = ? WHERE id = 1",
+            ("TECNOLOGIE INFORMATICHE",),
+        )
+        conn.execute(
+            "UPDATE discipline SET nome = ? WHERE id = 2",
+            ("TECNOLOGIE DELL'INFORMAZIONE E DELLA COMUNICAZIONE BIENNIO CAT",),
+        )
+        conn.execute("DELETE FROM offerta_formativa WHERE disciplina_id = 1")
+        conn.commit()
+    _aggiungi_piano(percorso, "TECNOLOGIE INFORMATICHE", 6)
+
+    completamento_cat = next(
+        voce for voce in main._calcola_completamento() if voce["corso"] == "CAT"
+    )
+
+    assert completamento_cat["ore"][0] == 0
+
+
+def test_completamento_conta_materie_comuni_previste_per_cat(monkeypatch, tmp_path):
+    percorso = _prepara_db(monkeypatch, tmp_path)
+    with db.connessione() as conn:
+        conn.execute("DELETE FROM offerta_formativa WHERE disciplina_id = 2")
+        conn.execute(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (2, 1, 1)"
+        )
+        conn.commit()
+    _aggiungi_piano(percorso, "MATERIA DESTINATARIA", 6)
+
+    completamento_cat = next(
+        voce for voce in main._calcola_completamento() if voce["corso"] == "CAT"
+    )
+
+    assert completamento_cat["ore"][0] == 6
+
+
+def test_completamento_conta_piano_comune_per_materia_agraria_di_articolazione(monkeypatch, tmp_path):
+    _prepara_db(monkeypatch, tmp_path)
+    with db.connessione() as conn:
+        conn.execute("DELETE FROM offerta_formativa WHERE disciplina_id = 2")
+        conn.execute(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (2, 6, 4)"
+        )
+        conn.commit()
+    _aggiungi_piano(
+        tmp_path / "corrente.db",
+        "MATERIA DESTINATARIA",
+        5,
+        corso="AGRARIO",
+        classe="QUARTA",
+    )
+
+    completamento_agrario = next(
+        voce for voce in main._calcola_completamento() if voce["corso"] == "AGRARIO"
+    )
+
+    assert completamento_agrario["ore"][3] == {
+        "articolazioni": [
+            {"nome": "PT", "ore": 5},
+            {"nome": "GAT", "ore": 0},
+            {"nome": "ENO", "ore": 0},
+        ],
+        "stato": "giallo",
+    }
+
+
+def test_completamento_agrario_somma_ogni_articolazione_separatamente(monkeypatch, tmp_path):
+    percorso = _prepara_db(monkeypatch, tmp_path)
+    with db.connessione() as conn:
+        conn.execute("DELETE FROM offerta_formativa WHERE disciplina_id = 2")
+        conn.executemany(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (2, ?, 4)",
+            [(5,), (6,), (7,)],
+        )
+        conn.commit()
+    _aggiungi_piano(
+        percorso, "MATERIA DESTINATARIA", 5, corso="AGRARIO", classe="QUARTA"
+    )
+    educazione_civica.salva_piano(
+        "AGRARIO",
+        "QUARTA",
+        "PT",
+        "MATERIA DESTINATARIA",
+        {
+            "macroarea": "COSTITUZIONE",
+            "voci": [{"macroarea": "COSTITUZIONE", "voce": "LEGALITA", "ore": 7}],
+            "ore_disciplina": 7,
+            "conferme": {},
+        },
+    )
+
+    completamento_agrario = next(
+        voce for voce in main._calcola_completamento() if voce["corso"] == "AGRARIO"
+    )
+
+    assert completamento_agrario["ore"][3] == {
+        "articolazioni": [
+            {"nome": "PT", "ore": 7},
+            {"nome": "GAT", "ore": 5},
+            {"nome": "ENO", "ore": 5},
+        ],
+        "stato": "giallo",
+    }
+
+
+def test_completamento_agrario_verde_solo_se_tutte_le_articolazioni_raggiungono_33(
+    monkeypatch, tmp_path
+):
+    percorso = _prepara_db(monkeypatch, tmp_path)
+    with db.connessione() as conn:
+        conn.execute("DELETE FROM offerta_formativa WHERE disciplina_id = 2")
+        conn.executemany(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (2, ?, 4)",
+            [(5,), (6,), (7,)],
+        )
+        conn.commit()
+    _aggiungi_piano(
+        percorso, "MATERIA DESTINATARIA", 33, corso="AGRARIO", classe="QUARTA"
+    )
+
+    completamento_agrario = next(
+        voce for voce in main._calcola_completamento() if voce["corso"] == "AGRARIO"
+    )
+
+    assert completamento_agrario["ore"][3] == {
+        "articolazioni": [
+            {"nome": "PT", "ore": 33},
+            {"nome": "GAT", "ore": 33},
+            {"nome": "ENO", "ore": 33},
+        ],
+        "stato": "verde",
+    }
+
+
+def test_piano_comune_agrario_e_visibile_nell_articolazione_della_materia(monkeypatch, tmp_path):
+    _prepara_db(monkeypatch, tmp_path)
+    with db.connessione() as conn:
+        conn.execute("DELETE FROM offerta_formativa WHERE disciplina_id = 2")
+        conn.execute(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (2, 6, 4)"
+        )
+        conn.commit()
+    _aggiungi_piano(
+        tmp_path / "corrente.db",
+        "MATERIA DESTINATARIA",
+        5,
+        corso="AGRARIO",
+        classe="QUARTA",
+    )
+    monkeypatch.setattr(main, "_sessione_inizializzata", True)
+
+    risposta = main.app.test_client().get(
+        "/admin/educazione-civica?corso=AGRARIO&classe=QUARTA"
+    )
+
+    assert risposta.status_code == 200
+    assert b'value="MATERIA DESTINATARIA" checked' in risposta.data
+    assert b"5-0-0" in risposta.data
+    assert b'aria-label="PT: 5, GAT: 0, ENO: 0"' in risposta.data
 
 
 def test_rimozione_parziale_rimuove_solo_il_contesto_interessato(monkeypatch, tmp_path):

@@ -1553,6 +1553,50 @@ def _corso_educazione(corso: str) -> tuple[str, str] | None:
     }.get(corso)
 
 
+INDIRIZZI_ARTICOLAZIONI_AGRARIO = {
+    "PT": "AGRARIO (p.t.)",
+    "GAT": "AGRARIO (g.a.t.)",
+    "ENO": "AGRARIO (eno)",
+}
+INDIRIZZO_AGRARIO_COMUNE = "AGRARIO (tutte le articolazioni)"
+
+
+def _disciplina_ec_presente(
+    corso: str, classe: str, disciplina: str, articolazione: str
+) -> bool:
+    if corso in ("CAT", "GRAFICO"):
+        return any(
+            catalogo.disciplina_presente(classe, indirizzo, disciplina)
+            for indirizzo in ("COMUNE", corso)
+        )
+    if corso != "AGRARIO":
+        return False
+
+    if articolazione == "COMUNE":
+        return catalogo.disciplina_presente(classe, INDIRIZZO_AGRARIO_COMUNE, disciplina) or any(
+            catalogo.disciplina_presente(classe, indirizzo, disciplina)
+            for indirizzo in INDIRIZZI_ARTICOLAZIONI_AGRARIO.values()
+        )
+    indirizzo = INDIRIZZI_ARTICOLAZIONI_AGRARIO.get(articolazione)
+    if indirizzo is None:
+        return False
+    if catalogo.disciplina_presente(classe, indirizzo, disciplina):
+        return True
+    esiste_specifica = any(
+        catalogo.disciplina_presente(classe, candidato, disciplina)
+        for candidato in INDIRIZZI_ARTICOLAZIONI_AGRARIO.values()
+    )
+    return not esiste_specifica and catalogo.disciplina_presente(
+        classe, INDIRIZZO_AGRARIO_COMUNE, disciplina
+    )
+
+
+def _ore_piano_educazione(piano: dict[str, object]) -> int:
+    return int(piano.get("ore_disciplina", 0) or 0) or sum(
+        int(voce.get("ore", 0) or 0) for voce in piano.get("voci", [])
+    )
+
+
 def _calcola_completamento() -> list[dict[str, object]]:
     risultato = []
     for corso in ("CAT", "GRAFICO", "AGRARIO"):
@@ -1563,10 +1607,45 @@ def _calcola_completamento() -> list[dict[str, object]]:
             for articolazione in articolazioni:
                 for piano in educazione_civica.piani_contesto(corso, classe, articolazione):
                     piani[(piano["disciplina"], articolazione)] = piano
+            if corso == "AGRARIO" and classe in ("TERZA", "QUARTA", "QUINTA"):
+                articolazioni = []
+                for sigla in INDIRIZZI_ARTICOLAZIONI_AGRARIO:
+                    piani_articolazione = {
+                        catalogo.nome_disciplina_visualizzato(str(disciplina)).casefold(): piano
+                        for (disciplina, articolazione), piano in piani.items()
+                        if articolazione == sigla
+                    }
+                    piani_comuni = {
+                        catalogo.nome_disciplina_visualizzato(str(disciplina)).casefold(): piano
+                        for (disciplina, articolazione), piano in piani.items()
+                        if articolazione == "COMUNE"
+                    }
+                    ore_articolazione = 0
+                    for chiave in piani_articolazione.keys() | piani_comuni.keys():
+                        piano = piani_articolazione.get(chiave) or piani_comuni.get(chiave)
+                        if piano and _disciplina_ec_presente(
+                            corso, classe, str(piano["disciplina"]), sigla
+                        ):
+                            ore_articolazione += _ore_piano_educazione(piano)
+                    articolazioni.append({
+                        "nome": sigla,
+                        "ore": ore_articolazione,
+                    })
+                ore_per_classe.append({
+                    "articolazioni": articolazioni,
+                    "stato": (
+                        "verde"
+                        if all(voce["ore"] >= 33 for voce in articolazioni)
+                        else "giallo"
+                    ),
+                })
+                continue
             ore = sum(
-                int(piano.get("ore_disciplina", 0) or 0)
-                or sum(int(voce.get("ore", 0) or 0) for voce in piano.get("voci", []))
+                _ore_piano_educazione(piano)
                 for piano in piani.values()
+                if _disciplina_ec_presente(
+                    corso, classe, str(piano["disciplina"]), str(piano["articolazione"])
+                )
             )
             ore_per_classe.append(ore)
         risultato.append({"corso": corso, "ore": ore_per_classe})
@@ -1668,21 +1747,8 @@ def admin_educazione_civica():
         }
         for articolazione in ("COMUNE", *articolazioni_visualizzate)
     }
-    indirizzi_articolazioni = {"PT": "AGRARIO (p.t.)", "GAT": "AGRARIO (g.a.t.)", "ENO": "AGRARIO (eno)"}
-    indirizzo_comune = "AGRARIO (tutte le articolazioni)"
-
     def disciplina_presente_nell_articolazione(disciplina: str, articolazione: str) -> bool:
-        if corso != "AGRARIO":
-            return catalogo.disciplina_presente(classe, indirizzo_catalogo, disciplina)
-        if articolazione == "COMUNE":
-            return catalogo.disciplina_presente(classe, indirizzo_comune, disciplina)
-        if catalogo.disciplina_presente(classe, indirizzi_articolazioni[articolazione], disciplina):
-            return True
-        esiste_specifica = any(
-            catalogo.disciplina_presente(classe, indirizzo, disciplina)
-            for indirizzo in indirizzi_articolazioni.values()
-        )
-        return not esiste_specifica and catalogo.disciplina_presente(classe, indirizzo_comune, disciplina)
+        return _disciplina_ec_presente(corso, classe, disciplina, articolazione)
 
     def piano_per_articolazione(disciplina: str, articolazione: str):
         piano_specifico = piani_per_articolazione[articolazione].get(disciplina)
@@ -1690,9 +1756,12 @@ def admin_educazione_civica():
             return piano_specifico
         if articolazione == "COMUNE":
             return piani_per_articolazione["COMUNE"].get(disciplina)
+        piano_comune = piani_per_articolazione["COMUNE"].get(disciplina)
+        if piano_comune and disciplina_presente_nell_articolazione(disciplina, articolazione):
+            return piano_comune
         esiste_specifica = any(
             catalogo.disciplina_presente(classe, indirizzo, disciplina)
-            for indirizzo in indirizzi_articolazioni.values()
+            for indirizzo in INDIRIZZI_ARTICOLAZIONI_AGRARIO.values()
         )
         if not esiste_specifica and disciplina_presente_nell_articolazione(disciplina, articolazione):
             return piani_per_articolazione["COMUNE"].get(disciplina)

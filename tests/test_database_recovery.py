@@ -197,6 +197,24 @@ def test_memorizza_educazione_civica_salva_quadro_senza_conferme(monkeypatch, tm
         "ITALIANO",
         {"DOCENTE|ITALIANO|M1|UD1": {"voci": ["LEGALITA"], "periodo": "PRIMO"}},
     )
+    conn = sqlite3.connect(admin)
+    conn.execute(
+        "INSERT INTO educazione_civica_backup (corso, classe, dump) "
+        "VALUES ('CAT', 'PRIMA', ?)",
+        (
+            json.dumps(
+                [
+                    {
+                        "articolazione": "COMUNE",
+                        "disciplina": "PIANO PRECEDENTE",
+                        "dati": json.dumps({"voci": [], "ore_disciplina": 0}),
+                    }
+                ]
+            ),
+        ),
+    )
+    conn.commit()
+    conn.close()
 
     monkeypatch.setattr(db, "FILE_DB_MASTER", master)
     monkeypatch.setattr(db, "FILE_DB_MASTER_ALTERNATIVO", tmp_path / "missing-master.db")
@@ -219,3 +237,16 @@ def test_memorizza_educazione_civica_salva_quadro_senza_conferme(monkeypatch, tm
         piani.close()
     assert dati["voci"][0]["ore"] == 4
     assert dati["conferme"] == {}
+    piani = sqlite3.connect(admin)
+    try:
+        snapshot = json.loads(
+            piani.execute(
+                "SELECT dump FROM educazione_civica_backup WHERE corso='CAT' AND classe='PRIMA'"
+            ).fetchone()[0]
+        )
+    finally:
+        piani.close()
+    assert [(piano["disciplina"], json.loads(piano["dati"])["ore_disciplina"]) for piano in snapshot] == [
+        ("ITALIANO", 4)
+    ]
+    assert json.loads(snapshot[0]["dati"])["conferme"] == {}
