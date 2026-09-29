@@ -34,6 +34,7 @@
 
     <fieldset class="frame-completamento">
         <legend>Completamento</legend>
+        <p class="nota">Agrario triennio: valori nell'ordine PT-GAT-ENO; la cella è verde solo se tutte le articolazioni raggiungono 33 ore.</p>
         <table class="elenco tabella-completamento">
             <thead>
                 <tr>
@@ -50,7 +51,13 @@
                 <tr>
                     <th>{{ riga_completamento.corso }}</th>
                     {% for ore in riga_completamento.ore %}
+                    {% if ore is mapping %}
+                    <td data-completamento-corso="{{ riga_completamento.corso }}" data-completamento-classe="{{ loop.index0 }}" class="completamento-{{ ore.stato }}" title="Ordine: PT - GAT - ENO" aria-label="PT: {{ ore.articolazioni[0].ore }}, GAT: {{ ore.articolazioni[1].ore }}, ENO: {{ ore.articolazioni[2].ore }}">
+                        <span class="ore-articolazioni">{{ ore.articolazioni | map(attribute='ore') | join('-') }}</span>
+                    </td>
+                    {% else %}
                     <td data-completamento-corso="{{ riga_completamento.corso }}" data-completamento-classe="{{ loop.index0 }}" class="{{ 'completamento-verde' if ore >= 33 else 'completamento-giallo' if ore > 0 else 'completamento-rosso' }}">{{ ore }}</td>
+                    {% endif %}
                     {% endfor %}
                 </tr>
             {% endfor %}
@@ -152,6 +159,7 @@
     .tabella-completamento .completamento-rosso { background: #c62828; color: #fff; }
     .tabella-completamento .completamento-giallo { background: #f9a825; color: #000; }
     .tabella-completamento .completamento-verde { background: #1b5e20; color: #fff; }
+    .tabella-completamento .ore-articolazioni { font-size: 9px; white-space: nowrap; }
     .riga-disciplina { display: grid; grid-template-columns: minmax(190px, 25%) 70px minmax(0, 1fr); gap: 8px; align-items: start; padding: 4px 0; border-bottom: 1px solid #ddd; font-size: 11px; font-weight: bold; }
     .scelta.compatta { display: flex; align-items: flex-start; gap: 5px; margin: 0; }
     .scelta.compatta span { overflow-wrap: anywhere; }
@@ -226,9 +234,25 @@
     }
     function aggiornaTabellaCompletamento(righe) {
         righe.forEach(riga => {
-            riga.ore.forEach((ore, indice) => {
+            riga.ore.forEach((valore, indice) => {
                 const cella = document.querySelector(`[data-completamento-corso="${riga.corso}"][data-completamento-classe="${indice}"]`);
                 if (!cella) return;
+                if (Array.isArray(valore.articolazioni)) {
+                    let riepilogo = cella.querySelector(".ore-articolazioni");
+                    if (!riepilogo) {
+                        riepilogo = document.createElement("span");
+                        riepilogo.className = "ore-articolazioni";
+                        cella.replaceChildren(riepilogo);
+                    }
+                    riepilogo.textContent = valore.articolazioni.map(voce => voce.ore).join("-");
+                    cella.title = "PT - GAT - ENO";
+                    cella.setAttribute("aria-label", valore.articolazioni.map(voce => `${voce.nome}: ${voce.ore}`).join(", "));
+                    cella.classList.toggle("completamento-verde", valore.stato === "verde");
+                    cella.classList.toggle("completamento-giallo", valore.stato === "giallo");
+                    cella.classList.remove("completamento-rosso");
+                    return;
+                }
+                const ore = valore;
                 cella.textContent = String(ore);
                 cella.classList.toggle("completamento-verde", ore >= 33);
                 cella.classList.toggle("completamento-giallo", ore > 0 && ore < 33);
