@@ -8,6 +8,7 @@ senza campi modulo, e salvati in ADMIN/output.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime
 import os
 from pathlib import Path
@@ -272,6 +273,7 @@ def genera_educazione_civica(
     corso: str,
     classe: str,
     *,
+    completamento: Mapping[tuple[str, str], int | Mapping[str, Any]],
     giorno: date | None = None,
     avanzamento: Avanzamento | None = None,
 ) -> Path:
@@ -309,6 +311,7 @@ def genera_educazione_civica(
                 corpo=10,
                 corpi=(10, 8, 10, 10),
             )
+            contiene_religione = False
             for disciplina in discipline:
                 piano = piani.get(disciplina)
                 if not piano or not piano.get("voci"):
@@ -322,10 +325,18 @@ def genera_educazione_civica(
                 conferme = list(piano.get("conferme", {}).values())
                 prima_disciplina = True
                 for macroarea, voci_macroarea in gruppi.items():
+                    nome_disciplina = catalogo.etichetta_disciplina(disciplina)
+                    nome_interno = catalogo.nome_disciplina_visualizzato(disciplina).strip().upper()
+                    if prima_disciplina and nome_interno in (
+                        "IRC (RELIGIONE CATTOLICA)",
+                        "ALTERNATIVA IRC",
+                    ):
+                        nome_disciplina += "*"
+                        contiene_religione = True
                     riga_tabella(
                         tabella_piano,
                         [
-                            catalogo.etichetta_disciplina(disciplina) if prima_disciplina else "",
+                            nome_disciplina if prima_disciplina else "",
                             str(piano.get("ore_disciplina", "")) if prima_disciplina else "",
                             macroarea,
                             "",
@@ -341,6 +352,42 @@ def genera_educazione_civica(
                         )
                         periodo = f"{conferma.get('quadrimestre')} quadrimestre" if conferma and conferma.get("quadrimestre") else "DA CONF."
                         riga_tabella(tabella_piano, ["", "", f"- {voce.get('voce', '')} ({voce.get('ore', 0)})", periodo], corpo=8)
+            totale = completamento.get((corso_db, classe_corrente))
+            if totale is None:
+                raise ValueError(
+                    f"Totale di Educazione civica mancante per {corso_db} {classe_corrente}."
+                )
+            if isinstance(totale, Mapping):
+                articolazioni = totale.get("articolazioni")
+                if not isinstance(articolazioni, list):
+                    raise ValueError(
+                        f"Articolazioni mancanti per {corso_db} {classe_corrente}."
+                    )
+                ore_per_articolazione = {
+                    str(voce["nome"]): int(voce["ore"])
+                    for voce in articolazioni
+                    if isinstance(voce, Mapping) and "nome" in voce and "ore" in voce
+                }
+                sigle = ("PT", "GAT", "ENO")
+                if any(sigla not in ore_per_articolazione for sigla in sigle):
+                    raise ValueError(
+                        f"Totali PT, GAT ed ENO incompleti per {corso_db} {classe_corrente}."
+                    )
+                totale_testo = " - ".join(
+                    f"{sigla}: {ore_per_articolazione[sigla]}" for sigla in sigle
+                )
+            else:
+                totale_testo = str(int(totale))
+            riga_unita(
+                tabella_piano,
+                f"TOTALE ORE EDUCAZIONE CIVICA: {totale_testo}",
+            )
+            if contiene_religione:
+                paragrafo(
+                    doc,
+                    "(*) esclusivamente per gli studenti che si avvalgono di tale materia.",
+                    corpo=9,
+                )
     momento = datetime.now()
     nome = f"program_educazione_civica_{momento:%d_%m_%y-%H.%M}.docx"
     return _salva(doc, nome)

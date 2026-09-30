@@ -282,7 +282,17 @@ def admin_crea_educazione_civica():
     formato = request.args.get("formato") or request.form.get("formato", "word")
 
     def lavoro(avanzamento):
-        percorso_word = documenti_istituto.genera_educazione_civica(corso, classe, avanzamento=avanzamento)
+        completamento_per_contesto = {
+            (str(riga["corso"]), classe_corrente): ore
+            for riga in _calcola_completamento()
+            for classe_corrente, ore in zip(CLASSI, riga["ore"])
+        }
+        percorso_word = documenti_istituto.genera_educazione_civica(
+            corso,
+            classe,
+            completamento=completamento_per_contesto,
+            avanzamento=avanzamento,
+        )
         risultato = {"percorso_word": str(percorso_word), "percorso": str(percorso_word)}
         if formato == "pdf":
             percorso_pdf = documenti_istituto.converti_pdf(percorso_word)
