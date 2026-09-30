@@ -264,7 +264,7 @@
                     </form>
                     {% if sezione == 'educazione-civica' %}
                     <form method="post" action="{{ url_for('admin_memorizza_educazione_civica') }}"
-                        onsubmit="if(!confirm('Memorizzare la situazione attuale di Educazione civica per questo corso e anno?')){ return false; } var password=prompt('Password admin per memorizzare la situazione Educazione civica'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
+                        onsubmit="if(!confirm('Memorizzare nell?archivio Admin tutti i quadri di Educazione civica di corsi, classi e articolazioni?')){ return false; } var password=prompt('Password admin per memorizzare la situazione Educazione civica'); if(password===null){ return false; } this.querySelector('input[name=\'password\']').value = password; return true;">
                         <input type="hidden" name="corso" value="{{ corso }}">
                         <input type="hidden" name="classe" value="{{ classe }}">
                         <input type="hidden" name="password" value="">
