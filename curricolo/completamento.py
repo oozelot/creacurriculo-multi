@@ -103,7 +103,9 @@ def griglia() -> dict[str, Any]:
             celle_per_classe.append({"classe": classe, "celle": celle})
         righe.append(
             {
-                "disciplina": " / ".join(sorted(nomi[sigla])),
+                "disciplina": " / ".join(
+                    sorted(catalogo.etichetta_disciplina(nome) for nome in nomi[sigla])
+                ),
                 "sigla": sigla,
                 "classi": celle_per_classe,
             }

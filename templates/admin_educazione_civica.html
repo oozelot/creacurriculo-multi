@@ -76,7 +76,7 @@
                 <legend>Discipline del corso e dell'anno: {{ corso }} {{ classe }}</legend>
                 {% for riga in righe %}
                 <div class="riga-disciplina" data-disciplina="{{ riga.disciplina }}">
-                    <div class="scelta compatta"><input type="checkbox" name="disciplina" value="{{ riga.disciplina }}" {{ 'checked' if riga.attiva }}> <span class="nome-disciplina-apri" role="button" tabindex="0">{{ riga.disciplina }}</span></div>
+                    <div class="scelta compatta"><input type="checkbox" name="disciplina" value="{{ riga.disciplina }}" {{ 'checked' if riga.attiva }}> <span class="nome-disciplina-apri" role="button" tabindex="0">{{ riga.disciplina | etichetta_disciplina }}</span></div>
                     <strong class="totale-riga" data-totale-riga>0 ore</strong>
                     <span class="riepilogo-disciplina" data-riepilogo>nessuna voce selezionata</span>
                 </div>
@@ -361,7 +361,8 @@
     function mostraPannello(disciplina) {
         disciplinaAperta = disciplina;
         const config = creaConfigurazione(disciplina);
-        titoloDisciplina.textContent = disciplina;
+        const riga = document.querySelector(`[data-disciplina="${CSS.escape(disciplina)}"]`);
+        titoloDisciplina.textContent = riga.querySelector(".nome-disciplina-apri").textContent;
         oreDisciplina.textContent = String(config.ore_disciplina || 0);
         document.querySelectorAll("[data-voci-macroarea]").forEach(contenitore => {
             const nome = contenitore.dataset.vociMacroarea;

@@ -312,7 +312,7 @@
         <div class="intestazione-dati {{ 'intestazione-step2' if request.endpoint in ['step1', 'step2', 'step3', 'modulo', 'unita', 'step4'] }} {{ 'riga-stato' if request.endpoint == 'step2' }}">
             <span class="dati-referente">{{ session['contesto']['cognome'] }} {{ session['contesto']['nome'] }}</span>
             <span class="dati-programmazione">&mdash; {{ session['contesto']['classe'] }} /
-                {{ session['contesto']['indirizzo'] }} / {{ session['contesto']['disciplina'] }}</span>
+                {{ session['contesto']['indirizzo'] }} / {{ session['contesto']['disciplina'] | etichetta_disciplina }}</span>
         </div>
         {% endif %}
 

@@ -49,7 +49,7 @@
             <div id="disciplina" class="scelte discipline-scelte">
                 {% for disciplina in discipline %}
                 <label data-valore="{{ disciplina }}"><input type="checkbox" name="disciplina" value="{{ disciplina }}"
-                        {{ 'checked' if contesto.get('disciplina') == disciplina }}> {{ disciplina }}</label>
+                        {{ 'checked' if contesto.get('disciplina') == disciplina }}> {{ disciplina | etichetta_disciplina }}</label>
                 {% endfor %}
             </div>
         </fieldset>
@@ -73,7 +73,7 @@
             <td>{{ lavoro.cognome }} {{ lavoro.nome }}</td>
             <td>{{ lavoro.classe }}</td>
             <td>{{ lavoro.indirizzo }}</td>
-            <td>{{ lavoro.disciplina }}</td>
+            <td>{{ lavoro.disciplina | etichetta_disciplina }}</td>
             <td class="azioni-programmazione">
                 <form method="post" action="{{ url_for('apri') }}">
                     {% for chiave, valore in lavoro.items() %}
@@ -172,15 +172,15 @@
 
         const precedente = disciplinaSelezionata()?.value;
         elenco.innerHTML = "";
-        for (const nome of discipline) {
+        for (const disciplina of discipline) {
             const etichetta = document.createElement("label");
             const casella = document.createElement("input");
             casella.type = "checkbox";
             casella.name = "disciplina";
-            casella.value = nome;
-            etichetta.dataset.valore = nome;
-            casella.checked = nome === precedente;
-            etichetta.append(casella, ` ${nome}`);
+            casella.value = disciplina.valore;
+            etichetta.dataset.valore = disciplina.valore;
+            casella.checked = disciplina.valore === precedente;
+            etichetta.append(casella, ` ${disciplina.etichetta}`);
             elenco.appendChild(etichetta);
         }
         aggiornaStato();

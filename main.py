@@ -74,6 +74,7 @@ NOMI_CLASSI = ["PRIME", "SECONDE", "TERZE", "QUARTE", "QUINTE"]
 app = Flask(__name__)
 app.secret_key = "curricolo-sviluppo-locale"
 app.jinja_env.filters["pulito"] = ripara_mojibake
+app.jinja_env.filters["etichetta_disciplina"] = catalogo.etichetta_disciplina
 app.config["ESEGUIBILE"] = getattr(sys, "frozen", False)
 
 _CREAZIONI: dict[str, dict[str, object]] = {}
@@ -328,7 +329,10 @@ def elimina():
 def api_discipline():
     classe = request.args.get("classe", "")
     indirizzo = request.args.get("indirizzo", "")
-    return jsonify(catalogo.discipline(classe, indirizzo))
+    return jsonify([
+        {"valore": nome, "etichetta": catalogo.etichetta_disciplina(nome)}
+        for nome in catalogo.discipline(classe, indirizzo)
+    ])
 
 
 @app.route("/step2", methods=["GET", "POST"])
@@ -841,18 +845,19 @@ def admin_memorizza_educazione_civica():
         ))
     corso = request.form.get("corso", "").strip()
     classe = request.form.get("classe", "").strip()
-    if corso not in ("CAT", "GRAFICO", "AGRARIO") or classe not in CLASSI:
-        flash("Corso o anno scolastico non validi. Nessuna modifica applicata.", "errore")
-        return redirect(request.referrer or url_for("admin_educazione_civica"))
-    if db.memorizza_educazione_civica_factory(corso, classe):
+    corso_redirect = corso if corso in ("CAT", "GRAFICO", "AGRARIO") else ""
+    classe_redirect = classe if classe in CLASSI else ""
+    if db.memorizza_educazione_civica_factory():
         flash(
-            f"Quadro di Educazione civica memorizzato nello stato Admin per {corso} {classe}. "
+            "Tutti i quadri di Educazione civica sono stati memorizzati nello stato Admin. "
             "Le assegnazioni dei periodi dovranno essere ricaricate dai file INI.",
             "info",
         )
     else:
         flash("Impossibile aggiornare il factory modificato.", "errore")
-    return redirect(url_for("admin_educazione_civica", corso=corso, classe=classe))
+    return redirect(url_for(
+        "admin_educazione_civica", corso=corso_redirect, classe=classe_redirect
+    ))
 
 
 @app.route("/admin/database")

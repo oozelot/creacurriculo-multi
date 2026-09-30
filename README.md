@@ -74,5 +74,11 @@ il comando di memorizzazione delle materie, dei percorsi e dei codici PECUP.
 
 La memorizzazione PECUP aggiorna nel checkpoint Admin l'elenco dei codici e delle
 descrizioni, oltre a materie e percorsi attivi; non copia le associazioni PECUP
-derivate dai file INI. La memorizzazione di Educazione civica salva il quadro del
-corso e della classe selezionati, senza le conferme di periodo provenienti dagli INI.
+derivate dai file INI. La memorizzazione di Educazione civica sostituisce nel
+checkpoint Admin tutti i piani di corsi, classi e articolazioni, senza le conferme
+di periodo provenienti dagli INI.
+
+Nelle interfacce e nei documenti, le materie Chimica, Fisica e Scienza della Terra
+e Biologia sono mostrate rispettivamente come Sc.Sp. Chimica, Sc.Sp. Fisica e
+Sc.Sp. Scienza della Terra e Biologia. I nomi interni, le sigle e i dati storici
+restano invariati.

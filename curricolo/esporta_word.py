@@ -66,7 +66,9 @@ def _tabella_scelte(doc, titolo: str, voci: list[str], scelte: list[int], altri:
 def _dati_docente(doc, prog: Programmazione, giorno: str) -> None:
     _etichetta_valore(doc, "CLASSE:", prog.classe, corpo=12)
     _etichetta_valore(doc, "INDIRIZZO:", prog.indirizzo, corpo=12)
-    _etichetta_valore(doc, "DISCIPLINA:", prog.disciplina, corpo=12)
+    _etichetta_valore(
+        doc, "DISCIPLINA:", catalogo.etichetta_disciplina(prog.disciplina), corpo=12
+    )
     _etichetta_valore(doc, "DOCUMENTO CREATO DA:", f"{prog.cognome} {prog.nome}", corpo=12)
     _etichetta_valore(doc, "In data:", giorno, corpo=12)
 

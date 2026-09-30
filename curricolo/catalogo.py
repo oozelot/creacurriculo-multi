@@ -14,6 +14,17 @@ def nome_disciplina_visualizzato(nome: str) -> str:
     return re.sub(r"\s*\(solo se specifica per (?:indirizzo|articolazione)\)$", "", nome, flags=re.IGNORECASE).strip()
 
 
+def etichetta_disciplina(nome: str) -> str:
+    """Restituisce il nome da mostrare senza cambiare l'identificativo interno."""
+    nome = nome_disciplina_visualizzato(nome)
+    etichette = {
+        "CHIMICA": "Sc.Sp. Chimica",
+        "FISICA": "Sc.Sp. Fisica",
+        "SCIENZA DELLA TERRA E BIOLOGIA": "Sc.Sp. Scienza della Terra e Biologia",
+    }
+    return etichette.get(nome.upper(), nome)
+
+
 def discipline_normalizzate(classe: str, indirizzi: list[str]) -> list[str]:
     """Unisce le discipline di piu' indirizzi senza duplicare le varianti testuali."""
     nomi = []

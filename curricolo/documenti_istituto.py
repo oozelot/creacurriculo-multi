@@ -73,8 +73,14 @@ def _intestazione_classe(doc, classe: str, indirizzi: list[str]) -> None:
 
 def _scheda_unita(doc, voce: dict[str, Any], *, solo_codici: bool) -> None:
     prog, modulo, unita = voce["programmazione"], voce["modulo"], voce["unita"]
-    paragrafo(doc, f"DISCIPLINA: {prog.disciplina}", grassetto=True, centrato=True, corpo=12,
-              sottolineato=True)
+    paragrafo(
+        doc,
+        f"DISCIPLINA: {catalogo.etichetta_disciplina(prog.disciplina)}",
+        grassetto=True,
+        centrato=True,
+        corpo=12,
+        sottolineato=True,
+    )
     etichetta_valore(doc, "UNITA' DI APPRENDIMENTO:", unita.titolo)
     etichetta_valore(doc, "FACENTE PARTE DEL MODULO:", modulo.titolo)
 
@@ -214,7 +220,9 @@ def genera_multidisciplinare(
             if avanzamento is not None:
                 avanzamento(f"Sviluppo modulo {numero_modulo} - unita' {numero_unita}")
             paragrafo(doc)
-            etichetta_valore(doc, "DISCIPLINA:", prog.disciplina, 12)
+            etichetta_valore(
+                doc, "DISCIPLINA:", catalogo.etichetta_disciplina(prog.disciplina), 12
+            )
             etichetta_valore(doc, "UNITA' DI APPRENDIMENTO:", unita.titolo)
             etichetta_valore(doc, "FACENTE PARTE DEL MODULO:", modulo.titolo)
             etichetta_valore(doc, "Svolto di norma nel periodo:", modulo.periodo)
@@ -314,7 +322,17 @@ def genera_educazione_civica(
                 conferme = list(piano.get("conferme", {}).values())
                 prima_disciplina = True
                 for macroarea, voci_macroarea in gruppi.items():
-                    riga_tabella(tabella_piano, [disciplina if prima_disciplina else "", str(piano.get("ore_disciplina", "")) if prima_disciplina else "", macroarea, ""], grassetto=True, corpo=10)
+                    riga_tabella(
+                        tabella_piano,
+                        [
+                            catalogo.etichetta_disciplina(disciplina) if prima_disciplina else "",
+                            str(piano.get("ore_disciplina", "")) if prima_disciplina else "",
+                            macroarea,
+                            "",
+                        ],
+                        grassetto=True,
+                        corpo=10,
+                    )
                     prima_disciplina = False
                     for voce in voci_macroarea:
                         conferma = next(

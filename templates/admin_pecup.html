@@ -2,7 +2,7 @@
 
 {% block contenuto %}
 <fieldset>
-    <legend>Gestione codici PECUP: {{ materia.nome }}</legend>
+    <legend>Gestione codici PECUP: {{ materia.nome | etichetta_disciplina }}</legend>
     <p class="nota">Completare una classe alla volta. La classe proposta e' la prima che non ha ancora tutti i codici PECUP; dopo il completamento e' possibile selezionare qualsiasi classe.</p>
 
     <form method="get" class="scelta-fonti">
@@ -15,7 +15,7 @@
             <div class="fonti-colonne">
                 <div><strong>Materie configurate da cui acquisire i testi</strong>
                     <div class="lista-fonti">{% for fonte in materie_fonti %}
-                        <label><input type="checkbox" name="fonte" value="{{ fonte.id }}" {{ 'checked' if fonte.id in fonti }}> {{ fonte.nome }}</label>
+                        <label><input type="checkbox" name="fonte" value="{{ fonte.id }}" {{ 'checked' if fonte.id in fonti }}> {{ fonte.nome | etichetta_disciplina }}</label>
                     {% endfor %}</div>
                 </div>
                 <div><strong>Anni scolastici dei testi sorgente</strong>

@@ -493,8 +493,8 @@ def memorizza_pecup_factory() -> bool:
     return True
 
 
-def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
-    """Memorizza il quadro civico e il relativo snapshot nello stato Admin."""
+def memorizza_educazione_civica_factory() -> bool:
+    """Memorizza tutti i piani civici e gli snapshot nello stato Admin."""
     archivio_admin = _inizializza_archivio_admin()
     if archivio_admin is None:
         return False
@@ -503,15 +503,12 @@ def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
     try:
         origine.row_factory = sqlite3.Row
         destinazione.execute("BEGIN IMMEDIATE")
-        destinazione.execute(
-            "DELETE FROM educazione_civica_piani WHERE corso = ? AND classe = ?",
-            (corso, classe),
-        )
         righe = origine.execute(
-            "SELECT articolazione, disciplina, dati FROM educazione_civica_piani WHERE corso = ? AND classe = ?",
-            (corso, classe),
+            "SELECT corso, classe, articolazione, disciplina, dati "
+            "FROM educazione_civica_piani ORDER BY corso, classe, articolazione, disciplina"
         ).fetchall()
         piani = []
+        backup_per_contesto: dict[tuple[str, str], list[dict[str, str]]] = {}
         for riga in righe:
             dati = json.loads(riga["dati"])
             if not isinstance(dati, dict):
@@ -519,36 +516,36 @@ def memorizza_educazione_civica_factory(corso: str, classe: str) -> bool:
             dati["conferme"] = {}
             contenuto = json.dumps(dati, ensure_ascii=False)
             piani.append(
-                (corso, classe, riga["articolazione"], riga["disciplina"], contenuto)
+                (
+                    riga["corso"],
+                    riga["classe"],
+                    riga["articolazione"],
+                    riga["disciplina"],
+                    contenuto,
+                )
             )
+            backup_per_contesto.setdefault((riga["corso"], riga["classe"]), []).append(
+                {
+                    "articolazione": riga["articolazione"],
+                    "disciplina": riga["disciplina"],
+                    "dati": contenuto,
+                }
+            )
+        destinazione.execute("DELETE FROM educazione_civica_piani")
+        destinazione.execute("DELETE FROM educazione_civica_backup")
         destinazione.executemany(
             "INSERT INTO educazione_civica_piani "
-            "(corso, classe, articolazione, disciplina, dati) VALUES (?, ?, ?, ?, ?)",
+            "(corso, classe, articolazione, disciplina, dati) "
+            "VALUES (?, ?, ?, ?, ?)",
             piani,
         )
-        destinazione.execute(
-            """
-            INSERT INTO educazione_civica_backup (corso, classe, dump, aggiornato_il)
-            VALUES (?, ?, ?, datetime('now', 'localtime'))
-            ON CONFLICT(corso, classe) DO UPDATE SET
-                dump = excluded.dump,
-                aggiornato_il = excluded.aggiornato_il
-            """,
-            (
-                corso,
-                classe,
-                json.dumps(
-                    [
-                        {
-                            "articolazione": articolazione,
-                            "disciplina": disciplina,
-                            "dati": dati,
-                        }
-                        for _, _, articolazione, disciplina, dati in piani
-                    ],
-                    ensure_ascii=False,
-                ),
-            ),
+        destinazione.executemany(
+            "INSERT INTO educazione_civica_backup (corso, classe, dump) "
+            "VALUES (?, ?, ?)",
+            [
+                (corso, classe, json.dumps(piani_contesto, ensure_ascii=False))
+                for (corso, classe), piani_contesto in backup_per_contesto.items()
+            ],
         )
         destinazione.commit()
     except Exception:

@@ -384,7 +384,7 @@
 <div id="modal-educazione-civica" class="modal-educazione-civica" hidden>
     <div class="finestra-educazione-civica" role="dialog" aria-modal="true">
         <div class="titolo-educazione-civica">EDUCAZIONE CIVICA</div>
-        <p><strong>{{ prog.disciplina }}</strong> - {{ prog.classe }} / {{ prog.indirizzo }}</p>
+        <p><strong>{{ prog.disciplina | etichetta_disciplina }}</strong> - {{ prog.classe }} / {{ prog.indirizzo }}</p>
         <p>UDA: <strong>{{ ud.titolo or 'da compilare' }}</strong></p>
         <fieldset>
             <legend>{{ educazione_piano.macroarea }}</legend>

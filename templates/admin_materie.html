@@ -21,7 +21,7 @@
                 <label class="materia {{ materia.avviso }} {{ 'completa' if materia.completa and not materia.avviso }}">
                     <input type="radio" name="materia" value="{{ materia.id }}"
                         {{ 'checked' if modifica and materia.id == materia_selezionata.id }}>
-                    <span title="{{ materia.nome }}">{{ materia.nome }}</span>
+                    <span title="{{ materia.nome | etichetta_disciplina }}">{{ materia.nome | etichetta_disciplina }}</span>
                 </label>
                 {% else %}
                 <p>Nessuna materia configurata.</p>
@@ -42,7 +42,8 @@
             <legend>{{ 'Modifica materia' if modifica else 'Aggiungi materia' }}</legend>
             <form method="post" action="{{ url_for('admin_modifica_materia', identificativo=materia_selezionata.id) if modifica else url_for('admin_aggiungi_materia') }}" id="form-materia">
                 <label for="nome">Nome della materia</label>
-                <input type="text" id="nome" name="nome" maxlength="120" value="{{ materia_selezionata.nome if modifica else '' }}" required>
+                <input type="text" id="nome" name="nome" maxlength="120"
+                    value="{{ materia_selezionata.nome | etichetta_disciplina if modifica else '' }}" required>
                 <label for="sigla">Sigla tecnica</label>
                 <input type="text" id="sigla" name="sigla" maxlength="3" list="suggerimenti-sigla" value="{{ materia_selezionata.sigla if modifica else '' }}" required>
                 <datalist id="suggerimenti-sigla"></datalist>
@@ -84,14 +85,14 @@
         {% if operazione_materia.fase == 'conferma' %}
         <strong id="titolo-operazione-materia">
             {{ 'Rimozione di percorsi' if operazione_materia.tipo == 'percorsi' else 'Eliminazione materia' }}:
-            {{ operazione_materia.materia.nome }}
+            {{ operazione_materia.materia.nome | etichetta_disciplina }}
         </strong>
         {% if operazione_materia.piani %}
         <p>La materia ha contenuti e ore di Educazione civica nei contesti seguenti:</p>
         <div class="riepilogo-rimozione">
             {% for piano in operazione_materia.piani %}
             <div>
-                <strong>{{ piano.corso }} {{ piano.classe }} {{ piano.articolazione }} - {{ piano.disciplina }}</strong>
+                <strong>{{ piano.corso }} {{ piano.classe }} {{ piano.articolazione }} - {{ piano.disciplina | etichetta_disciplina }}</strong>
                 <span>{{ piano.dati.ore_disciplina or 0 }} ore</span>
                 {% for voce in piano.dati.voci or [] %}
                 <small>{{ voce.voce }}: {{ voce.ore }} ore</small>
@@ -134,11 +135,11 @@
             <div class="destinazioni-rimozione">
                 {% for piano in operazione_materia.piani %}
                 <fieldset class="destinazione-rimozione">
-                    <legend>{{ piano.corso }} {{ piano.classe }} {{ piano.articolazione }} - {{ piano.disciplina }}</legend>
+                    <legend>{{ piano.corso }} {{ piano.classe }} {{ piano.articolazione }} - {{ piano.disciplina | etichetta_disciplina }}</legend>
                     <p>{{ piano.dati.ore_disciplina or 0 }} ore da trasferire</p>
                     <div class="lista-destinazioni">
                         {% for destinazione in piano.destinatari %}
-                        <label><input type="radio" name="destinatario_{{ piano.indice }}" value="{{ destinazione.id }}" required> {{ destinazione.nome }}</label>
+                        <label><input type="radio" name="destinatario_{{ piano.indice }}" value="{{ destinazione.id }}" required> {{ destinazione.nome | etichetta_disciplina }}</label>
                         {% else %}
                         <p class="nota">Nessuna materia compatibile in questo contesto. Esci senza memorizzare oppure elimina senza trasferire.</p>
                         {% endfor %}
