@@ -43,6 +43,15 @@ SIGLE_PECUP_OPZIONALI = {"EST", "REL"}
 TIPI_PECUP = ("abilita", "conoscenza", "competenza")
 PREFISSI_PECUP = {"abilita": "AB", "conoscenza": "CS", "competenza": "CT"}
 MATERIE_STORICHE_IN_EVIDENZA = {"ALTERNATIVA IRC", "BIOTECNOLOGIE AGRARIE"}
+ALIAS_DISCIPLINE_PECUP = {
+    "S.T.A. (SCIENZE E TECNOLOGIE APPLICATE)": "S.T.A.",
+    "T.T.R.G. (TECNOLOGIE E TECNICHE DI RAPPRESENTAZIONE GRAFICA)": "T.T.R.G.",
+}
+
+
+def _disciplina_pecup_normalizzata(disciplina: str) -> str:
+    nome = nome_disciplina_visualizzato(disciplina)
+    return ALIAS_DISCIPLINE_PECUP.get(nome.upper(), nome)
 
 
 def classi() -> list[str]:
@@ -725,6 +734,12 @@ def codici_pecup(
                 (tipo,),
             ).fetchall()
         else:
+            disciplina = _disciplina_pecup_normalizzata(str(disciplina or ""))
+            varianti_disciplina = (
+                disciplina,
+                f"{disciplina} (solo se specifica per indirizzo)",
+                f"{disciplina} (solo se specifica per articolazione)",
+            )
             righe = conn.execute(
                 """
                 SELECT DISTINCT p.codice, p.descrizione
@@ -733,19 +748,15 @@ def codici_pecup(
                   JOIN indirizzi i ON i.id = v.indirizzo_id
                   JOIN classi c ON c.numero = v.classe
                  WHERE p.tipo = ?
-                   AND (upper(?) = upper(v.disciplina)
-                        OR upper(?) LIKE upper(v.disciplina) || ' %')
+                   AND upper(trim(v.disciplina)) IN (upper(?), upper(?), upper(?))
                    AND c.nome = ?
                    AND i.nome IN (?, 'COMUNE')
                  ORDER BY p.codice
                 """,
-                (tipo, disciplina, disciplina, classe, indirizzo),
+                (tipo, *varianti_disciplina, classe, indirizzo),
             ).fetchall()
 
-        return [
-            {"codice": r["codice"], "descrizione": r["descrizione"]}
-            for r in righe
-        ]
+        return [{"codice": r["codice"], "descrizione": r["descrizione"]} for r in righe]
 
 
 def codici_pecup_materie(tipo: str) -> list[dict[str, object]]:

@@ -1,8 +1,68 @@
 import pytest
 
 import main
-from curricolo import catalogo
+from curricolo import catalogo, db
 from main import app
+
+
+def test_nuova_materia_non_eredita_pecup_da_un_nome_prefisso(monkeypatch, tmp_path):
+    monkeypatch.setattr(db, "FILE_DB", tmp_path / "curricolo.db")
+    monkeypatch.setattr(db, "CARTELLA_DATI", tmp_path)
+    with db.connessione() as conn:
+        conn.execute("INSERT INTO classi (numero, nome) VALUES (1, 'PRIMA')")
+        conn.execute(
+            "INSERT INTO indirizzi (id, nome, sigla, posizione) VALUES (1, 'COMUNE', 'COM', 1)"
+        )
+        conn.execute(
+            "INSERT INTO discipline (id, nome, sigla, sigla_ini) "
+            "VALUES (1, 'MATERIA BASE', 'MBS', 'MATER')"
+        )
+        conn.execute(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (1, 1, 1)"
+        )
+        for identificativo, tipo in enumerate(catalogo.TIPI_PECUP, start=1):
+            conn.execute(
+                "INSERT INTO pecup (id, tipo, codice, descrizione) VALUES (?, ?, ?, ?)",
+                (identificativo, tipo, f"COD{identificativo}", f"Descrizione {tipo}"),
+            )
+            conn.execute(
+                "INSERT INTO pecup_validita (pecup_id, disciplina, classe, indirizzo_id) "
+                "VALUES (?, 'MATERIA BASE', 1, 1)",
+                (identificativo,),
+            )
+        conn.execute(
+            "INSERT INTO pecup (id, tipo, codice, descrizione) "
+            "VALUES (4, 'abilita', 'STA01', 'Descrizione S.T.A.')"
+        )
+        conn.execute(
+            "INSERT INTO pecup_validita (pecup_id, disciplina, classe, indirizzo_id) "
+            "VALUES (4, 'S.T.A.', 1, 1)"
+        )
+
+    monkeypatch.setattr(main, "_sessione_inizializzata", True)
+    response = app.test_client().post(
+        "/admin/materie/aggiungi",
+        data={
+            "nome": "MATERIA BASE NUOVA",
+            "sigla": "MBN",
+            "percorso": "PRIMA|COMUNE",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"S\xc3\xac, gestisci codici PECUP" in response.data
+    assert b'class="materia arancione' in response.data
+
+    assert catalogo.codici_pecup(
+        "abilita", "MATERIA BASE (solo se specifica per indirizzo)", "PRIMA", "COMUNE"
+    ) == [{"codice": "COD1", "descrizione": "Descrizione abilita"}]
+    assert catalogo.codici_pecup(
+        "abilita",
+        "S.T.A. (SCIENZE E TECNOLOGIE APPLICATE)",
+        "PRIMA",
+        "COMUNE",
+    ) == [{"codice": "STA01", "descrizione": "Descrizione S.T.A."}]
 
 
 def test_salvataggio_pecup_include_competenze_e_ritorna_alla_selezione(monkeypatch):
