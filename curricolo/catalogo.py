@@ -735,26 +735,30 @@ def codici_pecup(
             ).fetchall()
         else:
             disciplina = _disciplina_pecup_normalizzata(str(disciplina or ""))
-            varianti_disciplina = (
-                disciplina,
-                f"{disciplina} (solo se specifica per indirizzo)",
-                f"{disciplina} (solo se specifica per articolazione)",
-            )
             righe = conn.execute(
                 """
-                SELECT DISTINCT p.codice, p.descrizione
+                SELECT DISTINCT p.codice, p.descrizione, v.disciplina
                   FROM pecup p
                   JOIN pecup_validita v ON v.pecup_id = p.id
                   JOIN indirizzi i ON i.id = v.indirizzo_id
                   JOIN classi c ON c.numero = v.classe
                  WHERE p.tipo = ?
-                   AND upper(trim(v.disciplina)) IN (upper(?), upper(?), upper(?))
                    AND c.nome = ?
                    AND i.nome IN (?, 'COMUNE')
                  ORDER BY p.codice
                 """,
-                (tipo, *varianti_disciplina, classe, indirizzo),
+                (tipo, classe, indirizzo),
             ).fetchall()
+            disciplina_normalizzata = disciplina.casefold()
+            return [
+                {"codice": codice, "descrizione": descrizione}
+                for codice, descrizione in dict.fromkeys(
+                    (riga["codice"], riga["descrizione"])
+                    for riga in righe
+                    if _disciplina_pecup_normalizzata(str(riga["disciplina"])).casefold()
+                    == disciplina_normalizzata
+                )
+            ]
 
         return [{"codice": r["codice"], "descrizione": r["descrizione"]} for r in righe]
 

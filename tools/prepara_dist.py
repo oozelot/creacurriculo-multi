@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import shutil
 import sys
 from pathlib import Path
 
@@ -10,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from curricolo import db
 from curricolo.config import FILE_DB_ADMIN, FILE_DB_MASTER_ALTERNATIVO
+
+CARTELLA_COMPILATI_VECCHI = Path(__file__).resolve().parent.parent / "compilati_vecchi"
 
 
 def _copia_archivio_pulito(origine: Path, destinazione: Path) -> None:
@@ -35,6 +38,10 @@ def prepara_distribuzione(destinazione: Path) -> None:
     pacchetto_sorgente_mac = (destinazione / "Avvia CreaCurricolo.command").is_file()
     if not destinazione.is_dir():
         raise FileNotFoundError(f"Cartella di distribuzione mancante: {destinazione}")
+    if not CARTELLA_COMPILATI_VECCHI.is_dir():
+        raise FileNotFoundError(
+            f"Cartella facoltativa compilati_vecchi mancante: {CARTELLA_COMPILATI_VECCHI}"
+        )
     if pacchetto_sorgente_mac:
         richiesti = ("main.py", "requirements.txt", "curricolo", "templates", "do_not_use", "tools")
         mancanti = [nome for nome in richiesti if not (destinazione / nome).exists()]
@@ -50,6 +57,7 @@ def prepara_distribuzione(destinazione: Path) -> None:
             "tools",
             "curricolobak.db",
             "curricolobak-modificato.db",
+            "compilati_vecchi",
         }
     else:
         if not any((destinazione / nome).is_file() for nome in eseguibili):
@@ -57,7 +65,10 @@ def prepara_distribuzione(destinazione: Path) -> None:
         if not (destinazione / "_internal").is_dir():
             raise FileNotFoundError(f"Risorse PyInstaller mancanti in {destinazione}")
         voci_attese = {"_internal", "curricolobak.db", "curricolobak-modificato.db"}
+        voci_attese.add("compilati_vecchi")
         voci_attese.update(nome for nome in eseguibili if (destinazione / nome).is_file())
+
+    shutil.copytree(CARTELLA_COMPILATI_VECCHI, destinazione / "compilati_vecchi")
 
     inattese = {percorso.name for percorso in destinazione.iterdir()} - voci_attese
     if inattese:
@@ -90,8 +101,6 @@ def prepara_distribuzione(destinazione: Path) -> None:
 
 def prepara_distribuzione_macos(destinazione: Path) -> None:
     """Assembla il pacchetto sorgente macOS con runtime Python installato dall'utente."""
-    import shutil
-
     radice = Path(__file__).resolve().parent.parent
     destinazione = destinazione.resolve()
     destinazione.mkdir(parents=True, exist_ok=True)

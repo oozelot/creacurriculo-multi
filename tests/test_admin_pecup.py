@@ -20,6 +20,13 @@ def test_nuova_materia_non_eredita_pecup_da_un_nome_prefisso(monkeypatch, tmp_pa
         conn.execute(
             "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (1, 1, 1)"
         )
+        conn.execute(
+            "INSERT INTO discipline (id, nome, sigla, sigla_ini) VALUES "
+            "(2, 'T.T.R.G. (TECNOLOGIE E TECNICHE DI RAPPRESENTAZIONE GRAFICA)', 'TRG', 'TTRGR')"
+        )
+        conn.execute(
+            "INSERT INTO offerta_formativa (disciplina_id, indirizzo_id, classe) VALUES (2, 1, 1)"
+        )
         for identificativo, tipo in enumerate(catalogo.TIPI_PECUP, start=1):
             conn.execute(
                 "INSERT INTO pecup (id, tipo, codice, descrizione) VALUES (?, ?, ?, ?)",
@@ -30,13 +37,23 @@ def test_nuova_materia_non_eredita_pecup_da_un_nome_prefisso(monkeypatch, tmp_pa
                 "VALUES (?, 'MATERIA BASE', 1, 1)",
                 (identificativo,),
             )
+        for identificativo, tipo in enumerate(catalogo.TIPI_PECUP, start=4):
+            conn.execute(
+                "INSERT INTO pecup (id, tipo, codice, descrizione) VALUES (?, ?, ?, ?)",
+                (identificativo, tipo, f"TTRG{identificativo}", f"PECUP TTRG {tipo}"),
+            )
+            conn.execute(
+                "INSERT INTO pecup_validita (pecup_id, disciplina, classe, indirizzo_id) "
+                "VALUES (?, 'T.T.R.G. (TECNOLOGIE E TECNICHE DI RAPPRESENTAZIONE GRAFICA)', 1, 1)",
+                (identificativo,),
+            )
         conn.execute(
             "INSERT INTO pecup (id, tipo, codice, descrizione) "
-            "VALUES (4, 'abilita', 'STA01', 'Descrizione S.T.A.')"
+            "VALUES (7, 'abilita', 'STA01', 'Descrizione S.T.A.')"
         )
         conn.execute(
             "INSERT INTO pecup_validita (pecup_id, disciplina, classe, indirizzo_id) "
-            "VALUES (4, 'S.T.A.', 1, 1)"
+            "VALUES (7, 'S.T.A.', 1, 1)"
         )
 
     monkeypatch.setattr(main, "_sessione_inizializzata", True)
@@ -63,6 +80,14 @@ def test_nuova_materia_non_eredita_pecup_da_un_nome_prefisso(monkeypatch, tmp_pa
         "PRIMA",
         "COMUNE",
     ) == [{"codice": "STA01", "descrizione": "Descrizione S.T.A."}]
+    assert catalogo.codici_pecup(
+        "abilita",
+        "T.T.R.G. (TECNOLOGIE E TECNICHE DI RAPPRESENTAZIONE GRAFICA)",
+        "PRIMA",
+        "COMUNE",
+    ) == [{"codice": "TTRG4", "descrizione": "PECUP TTRG abilita"}]
+    materia_ttrg = next(voce for voce in catalogo.materie() if voce["sigla"] == "TRG")
+    assert materia_ttrg["completa"] is True
 
 
 def test_salvataggio_pecup_include_competenze_e_ritorna_alla_selezione(monkeypatch):
