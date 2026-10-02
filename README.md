@@ -38,9 +38,10 @@ alla Release GitHub.
 ### Avvio su macOS
 
 Estrai lo ZIP e apri `Avvia CreaCurricolo.command`. Serve Python 3.10 o successivo.
-Se non e' disponibile, il launcher apre la pagina ufficiale dei download Python:
-installa il pacchetto macOS universal2 di python.org, firmato e notarizzato, quindi
-riapri il launcher (l'installer potrebbe chiedere la password di amministratore).
+Se non e' disponibile, il launcher mostra un avviso con le istruzioni per scaricare
+e installare Python. Il pulsante `Apri download ufficiali` apre la pagina macOS di
+python.org; scarica il programma di installazione universal2, apri il file `.pkg`
+e completa l'installazione, quindi riapri il launcher.
 Al primo avvio crea un ambiente virtuale e installa le
 dipendenze da PyPI. Se macOS blocca il file `.command`, usa Finder per consentirne
 l'apertura; il runtime Python viene invece eseguito dall'installazione ufficiale

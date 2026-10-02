@@ -3,6 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+mostra_istruzioni_python() {
+    scelta="$(osascript -e 'display dialog "CreaCurricoloMulti non riesce a usare Python 3.10 o successivo." & return & "Scarica il programma di installazione macOS universal2 dalla pagina ufficiale, apri il file .pkg scaricato e completa l’installazione. Poi riapri questo launcher." buttons {"Chiudi", "Apri download ufficiali"} default button "Apri download ufficiali" with title "Installare Python" with icon caution')"
+    if [[ "$scelta" == *"button returned:Apri download ufficiali"* ]]; then
+        open "https://www.python.org/downloads/macos/"
+    fi
+}
+
 PYTHON=""
 for candidate in "/Library/Frameworks/Python.framework/Versions/Current/bin/python3" \
     "$(command -v python3 2>/dev/null || true)"; do
@@ -15,17 +22,13 @@ for candidate in "/Library/Frameworks/Python.framework/Versions/Current/bin/pyth
 done
 
 if [[ -z "$PYTHON" ]]; then
-    echo "Per avviare CreaCurricoloMulti serve Python 3.10 o successivo."
-    echo "Scarica e installa il pacchetto macOS universale (universal2) dalla pagina ufficiale, poi riavvia questo launcher."
-    open "https://www.python.org/downloads/macos/" || true
+    mostra_istruzioni_python
     exit 1
 fi
 
 if [[ ! -x ".venv/bin/python" ]]; then
     if ! "$PYTHON" -m venv .venv; then
-        echo "Non riesco a creare l'ambiente Python. Installa Python dal sito ufficiale e riprova:"
-        echo "https://www.python.org/downloads/macos/"
-        read -r -p "Premi Invio per chiudere. "
+        mostra_istruzioni_python
         exit 1
     fi
 fi

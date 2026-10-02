@@ -68,6 +68,45 @@ def test_conferma_materia_senza_bozza_non_400():
     assert response.headers["Location"].endswith("/admin/materie/1/pecup")
 
 
+@pytest.mark.parametrize(
+    ("percorsi_mancanti", "mostra_conferma_pecup"),
+    [([("PRIMA", "COMUNE")], True), ([], False)],
+)
+def test_aggiunta_materia_apre_la_schermata_di_completamento(
+    monkeypatch, percorsi_mancanti, mostra_conferma_pecup
+):
+    materia = {
+        "id": 99,
+        "nome": "MATERIA NUOVA",
+        "sigla": "MNU",
+        "percorsi": [("PRIMA", "COMUNE")],
+        "avviso": "",
+        "completa": False,
+    }
+    monkeypatch.setattr(main, "_sessione_inizializzata", True)
+    monkeypatch.setattr(catalogo, "valida_sigla_tecnica", lambda sigla: True)
+    monkeypatch.setattr(catalogo, "sigla_tecnica_in_uso", lambda sigla: False)
+    monkeypatch.setattr(catalogo, "aggiungi_materia", lambda nome, sigla, percorsi: 99)
+    monkeypatch.setattr(
+        catalogo,
+        "percorsi_pecup_mancanti",
+        lambda identificativo: percorsi_mancanti,
+    )
+    monkeypatch.setattr(catalogo, "materia", lambda identificativo: materia)
+    monkeypatch.setattr(catalogo, "materie", lambda: [materia])
+
+    response = app.test_client().post(
+        "/admin/materie/aggiungi",
+        data={"nome": "MATERIA NUOVA", "sigla": "MNU", "percorso": "PRIMA|COMUNE"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'action="/admin/materie/99/modifica"' in response.data
+    assert b"Premi quando completato le modifiche" in response.data
+    assert (b"S\xc3\xac, gestisci codici PECUP" in response.data) == mostra_conferma_pecup
+
+
 def test_elimina_materia_usa_id_selezionato_nel_form(monkeypatch):
     eliminati = []
     materia = {

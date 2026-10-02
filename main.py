@@ -945,8 +945,10 @@ def admin_aggiungi_materia():
             percorsi.append((classe, indirizzo))
     if len(nome) < 3 or not catalogo.valida_sigla_tecnica(sigla) or not percorsi:
         flash("Inserire nome, sigla tecnica valida (3 caratteri, lettere o numeri, senza spazi) e almeno un percorso di studio.", "errore")
+        return redirect(url_for("admin_materie"))
     elif catalogo.sigla_tecnica_in_uso(sigla):
         flash("Sigla già in uso da un'altra materia.", "errore")
+        return redirect(url_for("admin_materie"))
     else:
         try:
             identificativo = catalogo.aggiungi_materia(nome, sigla, percorsi)
@@ -957,7 +959,8 @@ def admin_aggiungi_materia():
             flash("Materia aggiunta.", "info")
         except ValueError as errore:
             flash(str(errore), "errore")
-    return redirect(url_for("admin_materie"))
+            return redirect(url_for("admin_materie"))
+    return redirect(url_for("admin_materie", materia=identificativo))
 
 
 @app.route("/admin/materie/elimina", methods=["POST"])
