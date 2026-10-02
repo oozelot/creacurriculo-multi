@@ -57,8 +57,8 @@ I dati creati dall'applicazione sono salvati accanto all'eseguibile nella cartel
 della distribuzione: il database, le cartelle `ADMIN` e le cartelle dei docenti
 vengono creati direttamente nell'AppPath. Le risorse incluse nel pacchetto non
 vengono usate come archivio dei dati generati.
-La cartella sorgente `compilati_vecchi` non viene inclusa nei pacchetti di distribuzione;
-i dati storici restano separati dai dati operativi.
+La cartella `compilati_vecchi` contiene archivi INI storici, resta separata dai dati
+operativi e puo' essere consultata facoltativamente dall'utente.
 
 ## Database e ripristini
 
