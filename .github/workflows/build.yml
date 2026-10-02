@@ -30,6 +30,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
+    - name: Abilita percorsi lunghi per Git
+      if: runner.os == 'Windows'
+      run: git config --global core.longpaths true
+
     - uses: actions/checkout@v5
 
     - name: Imposta l'epoca deterministica della build
