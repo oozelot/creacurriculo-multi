@@ -13,33 +13,47 @@ permissions:
 jobs:
   build:
     name: Compila per ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
     
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            runner: windows-2022
+          - os: ubuntu-latest
+            runner: ubuntu-latest
+          - os: macos-latest
+            runner: macos-latest
+
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v5
 
+    - name: Imposta l'epoca deterministica della build
+      run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      shell: bash
+
     - name: Configura Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.10'
+        python-version: '3.10.22'
 
     - name: Installa dipendenze e PyInstaller
+      if: runner.os != 'Windows'
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         python -m pip install pyinstaller
       shell: bash
 
-    - name: Installa dipendenze Windows
+    - name: Installa dipendenze Windows bloccate
       if: runner.os == 'Windows'
-      run: python -m pip install pywin32
+      run: python -m pip install --require-hashes -r requirements-build-windows.txt
 
     - name: Esegui PyInstaller
       if: runner.os != 'macOS'
+      env:
+        PYTHONHASHSEED: '0'
       run: |
         python tools/pulisci_build.py
         python -m PyInstaller --clean --noconfirm CreaCurricolo.spec
@@ -87,8 +101,8 @@ jobs:
         path: dist/
 
     - name: Crea archivio di distribuzione
-      run: |
-        python -c "import shutil; shutil.make_archive('CreaCurricoloMulti-${{ matrix.os }}', 'zip', 'dist', 'CreaCurricoloMulti')"
+      run: python tools/archivia_dist.py dist/CreaCurricoloMulti CreaCurricoloMulti-${{ matrix.os }}.zip
+      shell: bash
 
     - name: Salva archivio di distribuzione
       uses: actions/upload-artifact@v4
