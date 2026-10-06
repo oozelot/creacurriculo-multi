@@ -621,9 +621,10 @@ def unita(numero: int, indice: int):
         modello.salva(prog)
         if 2 in ud.multidisciplinare and educazione_civica_valida:
             chiave_conferma = educazione_civica.chiave_conferma(
-                prog.cognome, prog.nome, prog.disciplina, numero, indice
+                prog.cognome, prog.nome, prog.disciplina, numero, indice,
+                prog.classe, prog.indirizzo,
             )
-            educazione_civica.registra_conferma(
+            conferma_registrata = educazione_civica.registra_conferma(
                 prog.classe,
                 prog.indirizzo,
                 prog.disciplina,
@@ -635,7 +636,22 @@ def unita(numero: int, indice: int):
                     "ore": ud.ec_ore,
                 },
             )
-        flash("Unita' di apprendimento salvata.", "info")
+            if not conferma_registrata:
+                app.logger.error(
+                    "Ore di Educazione civica non registrate per %s, %s, modulo %s UDA %s",
+                    prog.disciplina,
+                    prog.classe,
+                    numero,
+                    indice,
+                )
+                flash(
+                    "Unita' salvata, ma le ore di Educazione civica non sono state registrate nel piano.",
+                    "errore",
+                )
+            else:
+                flash("Unita' di apprendimento salvata.", "info")
+        else:
+            flash("Unita' di apprendimento salvata.", "info")
         return redirect(url_for("unita", numero=numero, indice=indice))
 
     return render_template(
@@ -1765,24 +1781,41 @@ def admin_educazione_civica():
         }
         for articolazione in ("COMUNE", *articolazioni_visualizzate)
     }
+    ambiti_conferme_archiviate = educazione_civica.ambiti_conferme_archiviate(classe)
+
     def disciplina_presente_nell_articolazione(disciplina: str, articolazione: str) -> bool:
         return _disciplina_ec_presente(corso, classe, disciplina, articolazione)
+
+    def piano_conferme_articolazione(
+        piano: dict[str, object] | None, articolazione: str
+    ) -> dict[str, object] | None:
+        if not piano:
+            return None
+        if corso != "AGRARIO" or classe in ("PRIMA", "SECONDA"):
+            return piano
+        piano_filtrato = dict(piano)
+        piano_filtrato["conferme"] = educazione_civica.conferme_per_articolazione(
+            piano, articolazione, ambiti_conferme_archiviate
+        )
+        return piano_filtrato
 
     def piano_per_articolazione(disciplina: str, articolazione: str):
         piano_specifico = piani_per_articolazione[articolazione].get(disciplina)
         if piano_specifico:
-            return piano_specifico
+            return piano_conferme_articolazione(piano_specifico, articolazione)
         if articolazione == "COMUNE":
             return piani_per_articolazione["COMUNE"].get(disciplina)
         piano_comune = piani_per_articolazione["COMUNE"].get(disciplina)
         if piano_comune and disciplina_presente_nell_articolazione(disciplina, articolazione):
-            return piano_comune
+            return piano_conferme_articolazione(piano_comune, articolazione)
         esiste_specifica = any(
             catalogo.disciplina_presente(classe, indirizzo, disciplina)
             for indirizzo in INDIRIZZI_ARTICOLAZIONI_AGRARIO.values()
         )
         if not esiste_specifica and disciplina_presente_nell_articolazione(disciplina, articolazione):
-            return piani_per_articolazione["COMUNE"].get(disciplina)
+            return piano_conferme_articolazione(
+                piani_per_articolazione["COMUNE"].get(disciplina), articolazione
+            )
         return None
 
     righe = []

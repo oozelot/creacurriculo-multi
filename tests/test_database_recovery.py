@@ -1,6 +1,7 @@
 import json
 import sqlite3
 
+import main
 from curricolo import db
 
 
@@ -182,7 +183,7 @@ def test_memorizza_pecup_aggiorna_catalogo_materie_senza_copiare_validita(monkey
     assert _conteggio(admin, "SELECT COUNT(*) FROM pecup_validita") == 1
 
 
-def test_memorizza_educazione_civica_salva_quadro_senza_conferme(monkeypatch, tmp_path):
+def test_memorizza_educazione_civica_salva_tutti_i_quadri_senza_conferme(monkeypatch, tmp_path):
     master = tmp_path / "master.db"
     admin = tmp_path / "admin.db"
     corrente = tmp_path / "corrente.db"
@@ -197,6 +198,40 @@ def test_memorizza_educazione_civica_salva_quadro_senza_conferme(monkeypatch, tm
         "ITALIANO",
         {"DOCENTE|ITALIANO|M1|UD1": {"voci": ["LEGALITA"], "periodo": "PRIMO"}},
     )
+    _aggiungi_piano(
+        corrente,
+        "GRAFICO",
+        "SECONDA",
+        "STORIA",
+        {"DOCENTE|STORIA|M1|UD1": {"voci": ["LEGALITA"], "periodo": "SECONDO"}},
+    )
+    conn = sqlite3.connect(admin)
+    conn.execute(
+        "INSERT INTO educazione_civica_backup (corso, classe, dump) "
+        "VALUES ('CAT', 'PRIMA', ?)",
+        (
+            json.dumps(
+                [
+                    {
+                        "articolazione": "COMUNE",
+                        "disciplina": "PIANO PRECEDENTE",
+                        "dati": json.dumps({"voci": [], "ore_disciplina": 0}),
+                    }
+                ]
+            ),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO educazione_civica_piani "
+        "(corso, classe, articolazione, disciplina, dati) "
+        "VALUES ('AGRARIO', 'SECONDA', 'COMUNE', 'PIANO OBSOLETO', '{}')"
+    )
+    conn.execute(
+        "INSERT INTO educazione_civica_backup (corso, classe, dump) "
+        "VALUES ('AGRARIO', 'SECONDA', '[]')"
+    )
+    conn.commit()
+    conn.close()
 
     monkeypatch.setattr(db, "FILE_DB_MASTER", master)
     monkeypatch.setattr(db, "FILE_DB_MASTER_ALTERNATIVO", tmp_path / "missing-master.db")
@@ -205,17 +240,64 @@ def test_memorizza_educazione_civica_salva_quadro_senza_conferme(monkeypatch, tm
     monkeypatch.setattr(db, "FILE_DB", corrente)
     monkeypatch.setattr(db, "CARTELLA_DATI", tmp_path)
 
-    assert db.memorizza_educazione_civica_factory("CAT", "PRIMA")
+    assert db.memorizza_educazione_civica_factory()
 
     assert _conteggio(admin, "SELECT COUNT(*) FROM educazione_civica_piani") == 2
     piani = sqlite3.connect(admin)
     try:
-        dati = json.loads(
-            piani.execute(
-                "SELECT dati FROM educazione_civica_piani WHERE corso='CAT' AND classe='PRIMA'"
-            ).fetchone()[0]
-        )
+        righe = piani.execute(
+            "SELECT corso, classe, disciplina, dati FROM educazione_civica_piani "
+            "ORDER BY corso, classe"
+        ).fetchall()
     finally:
         piani.close()
-    assert dati["voci"][0]["ore"] == 4
-    assert dati["conferme"] == {}
+    assert [(riga[0], riga[1], riga[2]) for riga in righe] == [
+        ("CAT", "PRIMA", "ITALIANO"),
+        ("GRAFICO", "SECONDA", "STORIA"),
+    ]
+    for _, _, _, contenuto in righe:
+        dati = json.loads(contenuto)
+        assert dati["voci"][0]["ore"] == 4
+        assert dati["conferme"] == {}
+    piani = sqlite3.connect(admin)
+    try:
+        snapshot = piani.execute(
+            "SELECT corso, classe, dump FROM educazione_civica_backup "
+            "ORDER BY corso, classe"
+        ).fetchall()
+    finally:
+        piani.close()
+    assert [(riga[0], riga[1]) for riga in snapshot] == [
+        ("CAT", "PRIMA"),
+        ("GRAFICO", "SECONDA"),
+    ]
+    for _, _, dump in snapshot:
+        piani_snapshot = json.loads(dump)
+        assert len(piani_snapshot) == 1
+        assert json.loads(piani_snapshot[0]["dati"])["conferme"] == {}
+
+
+def test_pulsante_memorizzazione_educazione_civica_non_limita_il_contesto(monkeypatch):
+    chiamata = []
+
+    def memorizza_tutti():
+        chiamata.append("tutti")
+        return True
+
+    monkeypatch.setattr(main, "_password_admin_valida", lambda _password: True)
+    monkeypatch.setattr(
+        db,
+        "memorizza_educazione_civica_factory",
+        memorizza_tutti,
+    )
+
+    risposta = main.app.test_client().post(
+        "/admin/memorizza-educazione-civica",
+        data={"password": "test", "corso": "CAT", "classe": "TERZA"},
+    )
+
+    assert risposta.status_code == 302
+    assert risposta.headers["Location"].endswith(
+        "/admin/educazione-civica?corso=CAT&classe=TERZA"
+    )
+    assert chiamata == ["tutti"]

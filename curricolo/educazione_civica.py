@@ -22,6 +22,10 @@ def quadrimestre_periodo(periodo: str) -> str:
     valore = periodo.strip().lower()
     if not valore:
         return ""
+    if "secondo quadrimestre" in valore:
+        return "II"
+    if "primo quadrimestre" in valore:
+        return "I"
     mesi_primo = ("settembre", "ottobre", "novembre", "dicembre", "gennaio")
     mesi_secondo = ("febbraio", "marzo", "aprile", "maggio", "giugno")
     if any(mese in valore for mese in mesi_secondo):
@@ -183,9 +187,93 @@ def _piano_per_docente(
     return None
 
 
+def conferme_per_articolazione(
+    dati: dict[str, Any] | None,
+    articolazione: str,
+    ambiti_archiviati: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
+    """Filtra le conferme di un piano comune per l'articolazione richiesta."""
+    conferme = (dati or {}).get("conferme", {})
+    if articolazione not in ARTICOLAZIONI_AGRARIO:
+        return dict(conferme)
+    ambiti_archiviati = ambiti_archiviati or {}
+    risultato = {}
+    for chiave, conferma in conferme.items():
+        if not isinstance(conferma, dict):
+            continue
+        ambito = conferma.get("ambito_articolazioni")
+        if not isinstance(ambito, list):
+            ambito = ambiti_archiviati.get(chiave, [])
+        if "TUTTE" in ambito or articolazione in ambito:
+            risultato[chiave] = conferma
+    return risultato
+
+
+def ambiti_conferme_archiviate(classe: str) -> dict[str, list[str]]:
+    """Ricostruisce l'ambito delle conferme legacy dai file INI archiviati."""
+    ambiti: dict[str, set[tuple[str, ...]]] = {}
+    with connessione() as conn:
+        righe = conn.execute(
+            "SELECT cognome, nome, classe, indirizzo, disciplina, contenuto "
+            "FROM ricevuti WHERE classe = ?",
+            (classe,),
+        ).fetchall()
+    for riga in righe:
+        corso, articolazione = contesto(riga["indirizzo"])
+        if corso == "AGRARIO" and articolazione in ARTICOLAZIONI_AGRARIO:
+            ambito = (articolazione,)
+        elif corso in ("AGRARIO", "COMUNE"):
+            ambito = ("TUTTE",)
+        else:
+            continue
+        try:
+            moduli = json.loads(riga["contenuto"]).get("moduli", [])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        for numero_modulo, modulo in enumerate(moduli, 1):
+            for indice_ud, unita in enumerate(modulo.get("unita", []), 1):
+                try:
+                    multidisciplinare = [
+                        int(valore) for valore in unita.get("multidisciplinare", [])
+                    ]
+                except (TypeError, ValueError):
+                    continue
+                if (
+                    2 not in multidisciplinare
+                    or not unita.get("ec_voci")
+                    or not unita.get("ec_ore")
+                ):
+                    continue
+                chiave = chiave_conferma(
+                    riga["cognome"], riga["nome"], riga["disciplina"],
+                    numero_modulo, indice_ud,
+                )
+                ambiti.setdefault(chiave, set()).add(ambito)
+    return {
+        chiave: list(ambito)
+        for chiave, valori in ambiti.items()
+        if len(valori) == 1
+        for ambito in valori
+    }
+
+
 def piano_per_docente(classe: str, indirizzo: str, disciplina: str) -> dict[str, Any] | None:
     risultato = _piano_per_docente(classe, indirizzo, disciplina)
-    return risultato[1] if risultato else None
+    if not risultato:
+        return None
+    corso, dati = risultato
+    corso_indirizzo, articolazione = contesto(indirizzo)
+    if (
+        corso == "AGRARIO"
+        and corso_indirizzo == "AGRARIO"
+        and classe not in ("PRIMA", "SECONDA")
+        and articolazione in ARTICOLAZIONI_AGRARIO
+    ):
+        dati = dict(dati)
+        dati["conferme"] = conferme_per_articolazione(
+            dati, articolazione, ambiti_conferme_archiviate(classe)
+        )
+    return dati
 
 
 def piano_completo(dati: dict[str, Any] | None) -> bool:
@@ -321,48 +409,110 @@ def elimina_piano(corso: str, classe: str, articolazione: str, disciplina: str) 
         conn.commit()
 
 
-def registra_conferma(classe: str, indirizzo: str, disciplina: str, chiave: str, dati: dict[str, str]) -> bool:
+def registra_conferma(classe: str, indirizzo: str, disciplina: str, chiave: str, dati: dict[str, Any]) -> bool:
     corso, articolazione = contesto(indirizzo)
+    from .catalogo import nome_disciplina_visualizzato
+
+    nome_disciplina = nome_disciplina_visualizzato(disciplina).casefold()
     corsi = _corsi_piano(corso)
     salvata = False
     for corso_piano in corsi:
-        piano_dati = piano(corso_piano, classe, articolazione, disciplina)
-        if piano_dati is None:
-            piano_dati = piano(corso_piano, classe, "COMUNE", disciplina)
-            articolazione_piano = "COMUNE"
-        else:
-            articolazione_piano = articolazione
+        piano_selezionato = None
+        for articolazione_piano in dict.fromkeys((articolazione, "COMUNE")):
+            piano_selezionato = next(
+                (
+                    candidato
+                    for candidato in piani_contesto(corso_piano, classe, articolazione_piano)
+                    if nome_disciplina_visualizzato(candidato["disciplina"]).casefold()
+                    == nome_disciplina
+                ),
+                None,
+            )
+            if piano_selezionato is not None:
+                break
+        if piano_selezionato is None:
+            continue
+        articolazione_piano = piano_selezionato["articolazione"]
+        disciplina_piano = piano_selezionato["disciplina"]
+        piano_dati = piano(corso_piano, classe, articolazione_piano, disciplina_piano)
         if not piano_disponibile(piano_dati):
             continue
         conferme = dict(piano_dati.get("conferme", {}))
-        conferme[chiave] = dati
+        conferma = dict(dati)
+        if corso_piano == "AGRARIO" and classe not in ("PRIMA", "SECONDA"):
+            conferma["ambito_articolazioni"] = (
+                [articolazione]
+                if corso == "AGRARIO" and articolazione in ARTICOLAZIONI_AGRARIO
+                else ["TUTTE"]
+            )
+        conferme[chiave] = conferma
         piano_dati["conferme"] = conferme
-        salva_piano(corso_piano, classe, articolazione_piano, disciplina, piano_dati)
+        salva_piano(corso_piano, classe, articolazione_piano, disciplina_piano, piano_dati)
         salvata = True
     return salvata
 
 
-def chiave_conferma(cognome: str, nome: str, disciplina: str, numero_modulo: int, indice_ud: int) -> str:
-    return f"{cognome} {nome}|{disciplina}|M{numero_modulo}|UD{indice_ud}"
+def chiave_conferma(
+    cognome: str,
+    nome: str,
+    disciplina: str,
+    numero_modulo: int,
+    indice_ud: int,
+    classe: str = "",
+    indirizzo: str = "",
+) -> str:
+    chiave = f"{cognome} {nome}|{disciplina}"
+    if classe or indirizzo:
+        chiave += f"|{classe}|{indirizzo}"
+    return f"{chiave}|M{numero_modulo}|UD{indice_ud}"
 
 
 def rimuovi_conferme_programmazione(prog: Any) -> None:
     corso, articolazione = contesto(prog.indirizzo)
+    from .catalogo import nome_disciplina_visualizzato
+
+    nome_disciplina = nome_disciplina_visualizzato(prog.disciplina).casefold()
     chiavi = set()
     for numero_modulo, modulo in enumerate(prog.moduli, 1):
         for indice_ud, _ in enumerate(modulo.unita, 1):
-            chiavi.add(chiave_conferma(prog.cognome, prog.nome, prog.disciplina, numero_modulo, indice_ud))
+            chiavi.add(
+                chiave_conferma(
+                    prog.cognome, prog.nome, prog.disciplina,
+                    numero_modulo, indice_ud, prog.classe, prog.indirizzo,
+                )
+            )
+            chiavi.add(
+                chiave_conferma(
+                    prog.cognome, prog.nome, prog.disciplina,
+                    numero_modulo, indice_ud,
+                )
+            )
             chiavi.add(f"{prog.cognome} {prog.nome}|M{numero_modulo}|UD{indice_ud}")
     for corso_piano in _corsi_piano(corso):
         for articolazione_piano in {articolazione, "COMUNE"}:
-            piano_dati = piano(corso_piano, prog.classe, articolazione_piano, prog.disciplina)
-            if piano_dati is None:
-                continue
-            conferme = dict(piano_dati.get("conferme", {}))
-            nuove_conferme = {chiave: dati for chiave, dati in conferme.items() if chiave not in chiavi}
-            if nuove_conferme != conferme:
-                piano_dati["conferme"] = nuove_conferme
-                salva_piano(corso_piano, prog.classe, articolazione_piano, prog.disciplina, piano_dati)
+            for candidato in piani_contesto(corso_piano, prog.classe, articolazione_piano):
+                if (
+                    nome_disciplina_visualizzato(candidato["disciplina"]).casefold()
+                    != nome_disciplina
+                ):
+                    continue
+                disciplina_piano = candidato["disciplina"]
+                piano_dati = piano(
+                    corso_piano, prog.classe, articolazione_piano, disciplina_piano
+                )
+                conferme = dict(piano_dati.get("conferme", {}))
+                nuove_conferme = {
+                    chiave: dati for chiave, dati in conferme.items() if chiave not in chiavi
+                }
+                if nuove_conferme != conferme:
+                    piano_dati["conferme"] = nuove_conferme
+                    salva_piano(
+                        corso_piano,
+                        prog.classe,
+                        articolazione_piano,
+                        disciplina_piano,
+                        piano_dati,
+                    )
 
 
 def sincronizza_conferme_programmazione(prog: Any) -> None:
@@ -375,7 +525,10 @@ def sincronizza_conferme_programmazione(prog: Any) -> None:
                 prog.classe,
                 prog.indirizzo,
                 prog.disciplina,
-                chiave_conferma(prog.cognome, prog.nome, prog.disciplina, numero_modulo, indice_ud),
+                chiave_conferma(
+                    prog.cognome, prog.nome, prog.disciplina,
+                    numero_modulo, indice_ud, prog.classe, prog.indirizzo,
+                ),
                 {
                     "voci": list(unita.ec_voci),
                     "quadrimestre": unita.ec_quadrimestre,
