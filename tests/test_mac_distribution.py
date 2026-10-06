@@ -25,6 +25,26 @@ def _crea_archivio(percorso):
         )
 
 
+def test_pacchetto_windows_esclude_le_materie_legacy(monkeypatch, tmp_path):
+    admin = tmp_path / "admin.db"
+    master = tmp_path / "master.db"
+    _crea_archivio(admin)
+    _crea_archivio(master)
+    monkeypatch.setattr(prepara_dist, "FILE_DB_ADMIN", admin)
+    monkeypatch.setattr(prepara_dist, "FILE_DB_MASTER_ALTERNATIVO", master)
+    distribuzione = tmp_path / "CreaCurricoloMulti"
+    distribuzione.mkdir()
+    (distribuzione / "CreaCurricoloMulti.exe").write_bytes(b"test")
+    (distribuzione / "_internal").mkdir()
+
+    prepara_dist.prepara_distribuzione(distribuzione)
+
+    assert not (distribuzione / "compilati_vecchi").exists()
+    with sqlite3.connect(distribuzione / "curricolobak-modificato.db") as conn:
+        assert conn.execute("SELECT COUNT(*) FROM ricevuti").fetchone()[0] == 0
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+
 def test_pacchetto_macos_usa_archivi_memorizzati_senza_corrente_o_ini(monkeypatch, tmp_path):
     admin = tmp_path / "admin.db"
     master = tmp_path / "master.db"
@@ -32,11 +52,6 @@ def test_pacchetto_macos_usa_archivi_memorizzati_senza_corrente_o_ini(monkeypatc
     _crea_archivio(master)
     monkeypatch.setattr(prepara_dist, "FILE_DB_ADMIN", admin)
     monkeypatch.setattr(prepara_dist, "FILE_DB_MASTER_ALTERNATIVO", master)
-    archivio_compilati = tmp_path / "compilati_vecchi"
-    file_compilato = archivio_compilati / "DIPARTIMENTO_TEST" / "PRIMA_TEST" / "datibase_programmazione.ini"
-    file_compilato.parent.mkdir(parents=True)
-    file_compilato.write_text("archivio facoltativo", encoding="utf-8")
-    monkeypatch.setattr(prepara_dist, "CARTELLA_COMPILATI_VECCHI", archivio_compilati)
     distribuzione = tmp_path / "CreaCurricoloMulti"
 
     prepara_dist.prepara_distribuzione_macos(distribuzione)
@@ -50,10 +65,7 @@ def test_pacchetto_macos_usa_archivi_memorizzati_senza_corrente_o_ini(monkeypatc
     assert "read -r -p" not in launcher
     assert (distribuzione / "curricolobak.db").is_file()
     assert (distribuzione / "curricolobak-modificato.db").is_file()
-    assert (
-        distribuzione / "compilati_vecchi" / "DIPARTIMENTO_TEST" / "PRIMA_TEST"
-        / "datibase_programmazione.ini"
-    ).read_text(encoding="utf-8") == "archivio facoltativo"
+    assert not (distribuzione / "compilati_vecchi").exists()
     assert not (distribuzione / "dati" / "curricolo.db").exists()
     assert not (distribuzione / "DIPARTIMENTO_DIRITTO").exists()
     with sqlite3.connect(distribuzione / "curricolobak-modificato.db") as conn:
