@@ -18,21 +18,22 @@ ARTICOLAZIONI_AGRARIO = ("PT", "GAT", "ENO")
 
 
 def quadrimestre_periodo(periodo: str) -> str:
-    """Restituisce I o II in base ai mesi compresi nel periodo del modulo."""
+    """Restituisce il quadrimestre in base alla sezione del catalogo dei periodi."""
     valore = periodo.strip().lower()
     if not valore:
         return ""
-    if "secondo quadrimestre" in valore:
-        return "II"
-    if "primo quadrimestre" in valore:
-        return "I"
-    mesi_primo = ("settembre", "ottobre", "novembre", "dicembre", "gennaio")
-    mesi_secondo = ("febbraio", "marzo", "aprile", "maggio", "giugno")
-    if any(mese in valore for mese in mesi_secondo):
-        return "II"
-    if any(mese in valore for mese in mesi_primo):
-        return "I"
-    return ""
+    percorso_periodi = CARTELLA_LEGACY / "moduli" / "periodi.ini"
+    periodi = [
+        riga.strip().lower()
+        for riga in percorso_periodi.read_text(encoding="cp1252").splitlines()
+        if riga.strip()
+    ]
+    try:
+        indice_periodo = periodi.index(valore)
+        indice_secondo_quadrimestre = periodi.index("secondo quadrimestre")
+    except ValueError:
+        return ""
+    return "I" if indice_periodo < indice_secondo_quadrimestre else "II"
 
 
 def contesto(indirizzo: str) -> tuple[str, str]:
