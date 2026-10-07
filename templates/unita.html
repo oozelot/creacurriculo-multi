@@ -408,9 +408,24 @@
             <option value="I" {{ 'selected' if ud.ec_quadrimestre == 'I' }}>I quadrimestre</option>
             <option value="II" {{ 'selected' if ud.ec_quadrimestre == 'II' }}>II quadrimestre</option>
         </select>
+        <p id="avviso-quadrimestre-educazione" role="status" aria-live="polite" hidden></p>
         <div class="comandi-educazione-civica">
             <button type="button" id="esci-educazione-civica">Esci</button>
-            <button type="submit" form="form-unita" id="memorizza-educazione-civica">Memorizza</button>
+            <button type="submit" form="form-unita" id="memorizza-educazione-civica" disabled>Memorizza</button>
+        </div>
+    </div>
+</div>
+<div id="attesa-salvataggio-educazione" class="attesa-salvataggio-educazione" role="status" aria-live="polite" hidden>
+    <span class="rotella-salvataggio-educazione" aria-hidden="true"></span>
+    <strong>Attendere, memorizzazione di Educazione civica in corso...</strong>
+</div>
+<div id="conferma-superamento-ore-educazione" class="conferma-superamento-ore-educazione" role="alertdialog" aria-modal="true" aria-labelledby="titolo-superamento-ore-educazione" aria-describedby="testo-superamento-ore-educazione" hidden>
+    <div class="finestra-superamento-ore-educazione">
+        <strong id="titolo-superamento-ore-educazione">Attenzione: ore oltre il residuo</strong>
+        <p id="testo-superamento-ore-educazione"></p>
+        <div class="comandi-superamento-ore-educazione">
+            <button type="button" id="annulla-superamento-ore-educazione">Annulla</button>
+            <button type="button" id="procedi-superamento-ore-educazione">OK per procedere</button>
         </div>
     </div>
 </div>
@@ -422,6 +437,10 @@
     .finestra-educazione-civica label, .finestra-educazione-civica input, .finestra-educazione-civica select { margin-top: 7px; }
     .finestra-educazione-civica .scelta { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 13px; line-height: 1.4; }
     .testo-voce-ec { display: inline-block; min-height: 20px; }
+    .finestra-educazione-civica .scelta.voce-educazione-esaurita {
+        background: #b9f6a5;
+        box-shadow: inset 0 0 0 1px #4c9a3a;
+    }
     .comandi-educazione-civica { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
     #memorizza-educazione-civica {
         background: #1b5e20;
@@ -437,67 +456,180 @@
         opacity: 0.9;
     }
     #esci-educazione-civica { background: #eee; color: #111; }
+    .attesa-salvataggio-educazione:not([hidden]) {
+        position: fixed;
+        inset: 0;
+        z-index: 100001;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: rgba(255, 255, 255, .92);
+        color: #222;
+        text-align: center;
+    }
+    .rotella-salvataggio-educazione {
+        width: 42px;
+        height: 42px;
+        border: 5px solid #ddd;
+        border-top-color: #1b5e20;
+        border-radius: 50%;
+        animation: gira-salvataggio-educazione .8s linear infinite;
+    }
+    @keyframes gira-salvataggio-educazione {
+        to { transform: rotate(360deg); }
+    }
+    .conferma-superamento-ore-educazione[hidden] { display: none; }
+    .conferma-superamento-ore-educazione:not([hidden]) {
+        position: fixed;
+        inset: 0;
+        z-index: 100002;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        background: rgba(0, 0, 0, .45);
+    }
+    .finestra-superamento-ore-educazione {
+        width: min(460px, 95vw);
+        padding: 20px;
+        border: 2px solid #555;
+        background: #fff;
+        color: #222;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, .25);
+    }
+    .comandi-superamento-ore-educazione {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+    }
+    #procedi-superamento-ore-educazione {
+        background: #1b5e20;
+        color: #fff;
+        font-weight: bold;
+    }
 </style>
 <script>
     const modalEducazione = document.getElementById("modal-educazione-civica");
     const sceltaEdCivica = document.querySelector('input[name="multidisciplinare"][value="2"]');
     const labelEdCivica = sceltaEdCivica?.closest("label");
     const bottoneMemorizzaEducazione = document.getElementById("memorizza-educazione-civica");
+    const avvisoQuadrimestreEducazione = document.getElementById("avviso-quadrimestre-educazione");
+    const popupSuperamentoOre = document.getElementById("conferma-superamento-ore-educazione");
+    const testoSuperamentoOre = document.getElementById("testo-superamento-ore-educazione");
+    const bottoneProcediSuperamentoOre = document.getElementById("procedi-superamento-ore-educazione");
+    const bottoneAnnullaSuperamentoOre = document.getElementById("annulla-superamento-ore-educazione");
+    const formEducazioneCivica = document.getElementById("form-unita");
     const quadrimestreModulo = {{ quadrimestre_modulo | tojson }};
     const statoInizialeVoci = [...document.querySelectorAll('input[name="ec_voci"]')].map(input => input.checked ? input.value : "");
     const statoInizialeOre = Number(document.getElementById("ec_ore").value || 0);
+    const statoInizialeQuadrimestre = document.getElementById("ec_quadrimestre").value;
     let edCivicaModificata = false;
-    let quadrimestreConfermato = false;
-    let ultimoAvvisoOre = "";
+    let superamentoOreConfermato = false;
+    function oreUtilizzateProposte(voce) {
+        const utilizzateSalvate = Number(voce.dataset.utilizzate || 0);
+        const oreUdSalvate = Number(voce.dataset.oreUd || 0);
+        const oreDaSvolgere = Number(document.getElementById("ec_ore").value || 0);
+        return Math.max(0, utilizzateSalvate - oreUdSalvate)
+            + (voce.checked ? oreDaSvolgere : 0);
+    }
+    function oreResidueDisponibili() {
+        const vociSelezionate = [
+            ...modalEducazione.querySelectorAll('input[name="ec_voci"]:checked'),
+        ];
+        if (!vociSelezionate.length) return 0;
+        return Math.min(...vociSelezionate.map(voce => {
+            const orePreviste = Number(voce.dataset.ore || 0);
+            const oreGiaUtilizzate = Number(voce.dataset.utilizzate || 0);
+            const oreUdSalvate = Number(voce.dataset.oreUd || 0);
+            return Math.max(0, orePreviste - (oreGiaUtilizzate - oreUdSalvate));
+        }));
+    }
+    function oreSuperanoResiduo() {
+        const valore = document.getElementById("ec_ore").value;
+        return modalEducazione.querySelector('input[name="ec_voci"]:checked')
+            && Boolean(valore)
+            && Number(valore) > oreResidueDisponibili();
+    }
     function aggiornaEvidenzaEdCivica() {
-        const attiva = Boolean(sceltaEdCivica && sceltaEdCivica.checked);
+        const voci = [...modalEducazione.querySelectorAll('input[name="ec_voci"]')];
+        const oreTotaliEsaurite = voci.length > 0 && voci.every(voce => {
+            const orePreviste = Number(voce.dataset.ore || 0);
+            const oreUtilizzate = oreUtilizzateProposte(voce);
+            return orePreviste > 0 && oreUtilizzate >= orePreviste;
+        });
+        const attiva = Boolean(sceltaEdCivica && sceltaEdCivica.checked) || oreTotaliEsaurite;
         labelEdCivica?.classList.toggle("ed-civica-attiva", attiva);
-        labelEdCivica?.classList.toggle("ed-civica-disponibile", !attiva && {{ educazione_piano_pronto | tojson }});
+        labelEdCivica?.classList.toggle(
+            "ed-civica-disponibile",
+            !sceltaEdCivica?.checked && !oreTotaliEsaurite && {{ educazione_piano_pronto | tojson }}
+        );
     }
     function aggiornaTestoVociEducazione() {
-        const oreDaSvolgere = Number(document.getElementById("ec_ore").value || 0);
-        const oreMassime = [...modalEducazione.querySelectorAll('input[name="ec_voci"]:checked')]
-            .reduce((totale, voce) => totale + Number(voce.dataset.ore || 0), 0);
         modalEducazione.querySelectorAll('input[name="ec_voci"]').forEach(input => {
             const label = input.closest("label");
             const testo = label?.querySelector(".testo-voce-ec");
             const ore = Number(input.dataset.ore || 0);
             if (!testo) return;
             const selezionata = input.checked;
-            const oreUtilizzateSalvate = Number(input.dataset.utilizzate || 0);
-            const oreUdSalvate = Number(input.dataset.oreUd || 0);
-            const utilizzate = selezionata
-                ? Math.max(0, oreUtilizzateSalvate - oreUdSalvate + oreDaSvolgere)
-                : oreUtilizzateSalvate;
+            const utilizzate = oreUtilizzateProposte(input);
             const eccedenza = Math.max(0, utilizzate - ore);
             const residuo = Math.max(0, ore - utilizzate);
+            label?.classList.toggle("voce-educazione-esaurita", ore > 0 && residuo === 0);
             testo.textContent = selezionata
                 ? `${input.value} (${ore} ore, utilizzate ${utilizzate} ore, ${eccedenza > 0 ? `${eccedenza} ore in eccesso` : `residue ${residuo} ore`})`
                 : `${input.value} (${ore} ore${utilizzate > 0 ? `, utilizzate ${utilizzate} ore, ${eccedenza > 0 ? `${eccedenza} ore in eccesso` : `residue ${residuo} ore`}` : ""})`;
         });
-        if (oreMassime > 0 && oreDaSvolgere > oreMassime) {
+        if (oreSuperanoResiduo()) {
             document.getElementById("ec_ore").setAttribute("data-superato", "true");
         } else {
             document.getElementById("ec_ore").removeAttribute("data-superato");
         }
+        aggiornaEvidenzaEdCivica();
     }
     function haModificheEducazione() {
         const vociCorrenti = [...document.querySelectorAll('input[name="ec_voci"]')].map(input => input.checked ? input.value : "");
         const oreCorrenti = Number(document.getElementById("ec_ore").value || 0);
         const vociDiversi = statoInizialeVoci.length !== vociCorrenti.length || statoInizialeVoci.some((valore, indice) => valore !== vociCorrenti[indice]);
-        return vociDiversi || oreCorrenti !== statoInizialeOre;
+        const quadrimestreCorrente = document.getElementById("ec_quadrimestre").value;
+        return vociDiversi
+            || oreCorrenti !== statoInizialeOre
+            || quadrimestreCorrente !== statoInizialeQuadrimestre;
     }
     function aggiornaStatoMemorizzaEducazione() {
         const vociSelezionate = [...modalEducazione.querySelectorAll('input[name="ec_voci"]:checked')];
         const haSelezione = vociSelezionate.length > 0;
+        const campoOre = document.getElementById("ec_ore");
+        const oreValide = campoOre.value !== ""
+            && campoOre.validity.valid
+            && Number.isInteger(Number(campoOre.value))
+            && Number(campoOre.value) > 0;
+        const campoQuadrimestre = document.getElementById("ec_quadrimestre");
+        const quadrimestreValido = Boolean(
+            quadrimestreModulo && campoQuadrimestre.value === quadrimestreModulo
+        );
         const haModifiche = haModificheEducazione();
-        const attivo = haSelezione && haModifiche;
+        const attivo = haSelezione && oreValide && quadrimestreValido && haModifiche;
         bottoneMemorizzaEducazione.disabled = !attivo;
         bottoneMemorizzaEducazione.style.background = attivo ? '#1b5e20' : '#d9d9d9';
         bottoneMemorizzaEducazione.style.color = attivo ? '#ffeb3b' : '#666';
         bottoneMemorizzaEducazione.style.borderColor = attivo ? '#123d14' : '#999';
+        avvisoQuadrimestreEducazione.hidden = true;
         if (!haSelezione) {
             bottoneMemorizzaEducazione.title = "Selezionare almeno una voce di Educazione civica prima di memorizzare.";
+        } else if (!oreValide) {
+            bottoneMemorizzaEducazione.title = "Inserire un numero valido di ore da svolgere.";
+        } else if (!campoQuadrimestre.value) {
+            bottoneMemorizzaEducazione.title = "Selezionare il quadrimestre prima di memorizzare.";
+        } else if (!quadrimestreValido) {
+            const messaggio = quadrimestreModulo
+                ? `Selezionare ${quadrimestreModulo === "I" ? "il I" : "il II"} quadrimestre, in base al periodo del modulo.`
+                : "Il periodo del modulo non consente di determinare il quadrimestre.";
+            bottoneMemorizzaEducazione.title = messaggio;
+            avvisoQuadrimestreEducazione.textContent = messaggio;
+            avvisoQuadrimestreEducazione.hidden = false;
         } else if (!haModifiche) {
             bottoneMemorizzaEducazione.title = "Nessuna modifica da memorizzare.";
         } else {
@@ -540,60 +672,53 @@
     }
     aggiornaEvidenzaEdCivica();
     function controllaOreEducazione() {
-        const ore = document.getElementById("ec_ore");
-        const oreResidue = [...modalEducazione.querySelectorAll('input[name="ec_voci"]:checked')]
-            .reduce((totale, voce) => {
-                const orePreviste = Number(voce.dataset.ore || 0);
-                const oreGiaUtilizzate = Number(voce.dataset.utilizzate || 0);
-                const oreUdSalvate = Number(voce.dataset.oreUd || 0);
-                return totale + Math.max(0, orePreviste - (oreGiaUtilizzate - oreUdSalvate));
-            }, 0);
-        if (ore.value && oreResidue > 0 && Number(ore.value) > oreResidue) {
-            const eccesso = Number(ore.value) - oreResidue;
-            const chiaveAvviso = `${ore.value}|${oreResidue}`;
-            if (chiaveAvviso !== ultimoAvvisoOre) {
-                ultimoAvvisoOre = chiaveAvviso;
-                const conferma = confirm(`Hai inserito ${Number(ore.value)} ore, ma il residuo disponibile e' ${oreResidue}. Confermi di mantenere ${Number(ore.value)} ore utilizzate con ${eccesso} ora/e in eccesso?`);
-                if (!conferma) {
-                    ore.value = String(oreResidue);
-                    ore.focus();
-                }
-            }
-        } else {
-            ultimoAvvisoOre = "";
-        }
         aggiornaTestoVociEducazione();
         aggiornaStatoMemorizzaEducazione();
     }
-    function controllaQuadrimestreEducazione() {
-        const quadrimestre = document.getElementById("ec_quadrimestre").value;
-        return Boolean(quadrimestre && quadrimestre !== quadrimestreModulo);
-    }
-    function confermaQuadrimestreEducazione() {
-        if (!controllaQuadrimestreEducazione()) {
-            quadrimestreConfermato = false;
-            return true;
-        }
-        if (quadrimestreConfermato) return true;
-        quadrimestreConfermato = confirm("Il periodo del modulo non corrisponde a quello di svolgimento dell'UDA. Il termine di valutazione del primo quadrimestre e' gennaio. Vuoi memorizzare comunque?");
-        if (!quadrimestreConfermato) {
-            document.getElementById("ec_quadrimestre").value = quadrimestreModulo;
-        }
-        return quadrimestreConfermato;
-    }
     function controllaEducazioneCivica(evento) {
         controllaOreEducazione();
-        if (!confermaQuadrimestreEducazione()) {
+        if (sceltaEdCivica?.checked && bottoneMemorizzaEducazione.disabled) {
             evento.preventDefault();
+            if (!document.getElementById("ec_ore").value) {
+                document.getElementById("ec_ore").focus();
+            } else {
+                document.getElementById("ec_quadrimestre").focus();
+            }
             return;
         }
+        if (oreSuperanoResiduo() && !superamentoOreConfermato) {
+            evento.preventDefault();
+            const residuo = oreResidueDisponibili();
+            const oreInserite = Number(document.getElementById("ec_ore").value);
+            const eccesso = oreInserite - residuo;
+            testoSuperamentoOre.textContent =
+                `Stai cercando di memorizzare ${oreInserite} ore, ma per almeno una delle voci selezionate ` +
+                `il residuo disponibile e' ${residuo}. ` +
+                `Stai inserendo ${eccesso} ore in piu' di quelle necessarie. Vuoi procedere?`;
+            popupSuperamentoOre.hidden = false;
+            bottoneProcediSuperamentoOre.focus();
+            return;
+        }
+        superamentoOreConfermato = false;
         edCivicaModificata = false;
+        bottoneMemorizzaEducazione.disabled = true;
+        document.getElementById("attesa-salvataggio-educazione").hidden = false;
     }
+    bottoneProcediSuperamentoOre.addEventListener("click", () => {
+        popupSuperamentoOre.hidden = true;
+        superamentoOreConfermato = true;
+        formEducazioneCivica.requestSubmit(bottoneMemorizzaEducazione);
+    });
+    bottoneAnnullaSuperamentoOre.addEventListener("click", () => {
+        popupSuperamentoOre.hidden = true;
+        document.getElementById("ec_ore").focus();
+    });
     document.getElementById("ec_ore").addEventListener("change", () => {
         edCivicaModificata = true;
         controllaOreEducazione();
         aggiornaStatoMemorizzaEducazione();
     });
+    document.getElementById("ec_ore").addEventListener("input", aggiornaStatoMemorizzaEducazione);
     document.getElementById("ec_ore").addEventListener("blur", () => {
         edCivicaModificata = true;
         controllaOreEducazione();
@@ -609,9 +734,9 @@
     });
     document.getElementById("ec_quadrimestre").addEventListener("change", () => {
         edCivicaModificata = true;
-        confermaQuadrimestreEducazione();
+        aggiornaStatoMemorizzaEducazione();
     });
-    document.getElementById("form-unita").addEventListener("submit", controllaEducazioneCivica);
+    formEducazioneCivica.addEventListener("submit", controllaEducazioneCivica);
     aggiornaTestoVociEducazione();
     aggiornaStatoMemorizzaEducazione();
 </script>
